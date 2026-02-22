@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Bebas_Neue, IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import './globals.css';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const display = Bebas_Neue({
   weight: '400',
@@ -31,8 +32,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${display.variable} ${body.variable} ${mono.variable} antialiased`}>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => {
+  try {
+    let t = localStorage.getItem('theme');
+    if (t !== 'light' && t !== 'dark') {
+      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.dataset.theme = t;
+  } catch (e) {
+    // ignore
+  }
+})();`,
+          }}
+        />
+      </head>
+      <body className={`${display.variable} ${body.variable} ${mono.variable} antialiased`}>
+        {children}
+        <ThemeToggle />
+      </body>
     </html>
   );
 }
