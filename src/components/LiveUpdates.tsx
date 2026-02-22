@@ -18,6 +18,7 @@ export default function LiveUpdates() {
       es.addEventListener('race_results_updated', refresh);
       es.addEventListener('season_data_updated', refresh);
       es.addEventListener('random_reviews_updated', refresh);
+      es.addEventListener('join_requests_updated', refresh);
 
       es.addEventListener('error', () => {
         try {

@@ -38,6 +38,16 @@ function migrate(db: Database.Database) {
       primary key (league_id, user_id)
     );
 
+    create table if not exists league_join_requests (
+      league_id text not null references leagues(id) on delete cascade,
+      user_id text not null references users(id) on delete cascade,
+      status text not null check (status in ('pending','approved','rejected')),
+      created_at text not null,
+      decided_by text references users(id) on delete set null,
+      decided_at text,
+      primary key (league_id, user_id)
+    );
+
     create table if not exists seasons (
       year integer primary key
     );

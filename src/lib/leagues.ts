@@ -53,3 +53,59 @@ export function joinLeague(userId: string, codeRaw: string) {
 
   return { id: String(league.id), code: String(league.code), name: String(league.name) };
 }
+
+export function requestToJoinLeague(userId: string, leagueId: string) {
+  const league = db().prepare('select id from leagues where id = ?').get(leagueId) as any;
+  if (!league) throw new Error('league_not_found');
+
+  const member = db()
+    .prepare('select 1 from league_members where league_id = ? and user_id = ?')
+    .get(leagueId, userId);
+  if (member) return { ok: true as const, status: 'already_member' as const };
+
+  db().prepare(
+    `insert into league_join_requests (league_id, user_id, status, created_at)
+     values (?,?, 'pending', ?)
+     on conflict (league_id, user_id) do update set
+       status=case when league_join_requests.status = 'rejected' then 'pending' else league_join_requests.status end,
+       created_at=excluded.created_at`
+  ).run(leagueId, userId, nowIso());
+
+  return { ok: true as const, status: 'pending' as const };
+}
+
+export function decideJoinRequest(ownerUserId: string, leagueId: string, userId: string, decision: 'approve' | 'reject') {
+  const league = db().prepare('select owner_id from leagues where id = ?').get(leagueId) as any;
+  if (!league) throw new Error('league_not_found');
+  if (String(league.owner_id) !== ownerUserId) throw new Error('not_owner');
+
+  const now = nowIso();
+  const tx = db().transaction(() => {
+    if (decision === 'approve') {
+      db().prepare('insert or ignore into league_members (league_id, user_id, role, joined_at) values (?,?,?,?)').run(
+        leagueId,
+        userId,
+        'member',
+        now
+      );
+      db().prepare(
+        `insert into league_join_requests (league_id, user_id, status, created_at, decided_by, decided_at)
+         values (?,?, 'approved', ?, ?, ?)
+         on conflict (league_id, user_id) do update set
+           status='approved',
+           decided_by=excluded.decided_by,
+           decided_at=excluded.decided_at`
+      ).run(leagueId, userId, now, ownerUserId, now);
+    } else {
+      db().prepare(
+        `insert into league_join_requests (league_id, user_id, status, created_at, decided_by, decided_at)
+         values (?,?, 'rejected', ?, ?, ?)
+         on conflict (league_id, user_id) do update set
+           status='rejected',
+           decided_by=excluded.decided_by,
+           decided_at=excluded.decided_at`
+      ).run(leagueId, userId, now, ownerUserId, now);
+    }
+  });
+  tx();
+}

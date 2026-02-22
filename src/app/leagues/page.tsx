@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { requestToJoinLeague } from '@/lib/leagues';
+import LiveUpdates from '@/components/LiveUpdates';
 
 export default async function LeaguesPage() {
   let user;
@@ -11,29 +13,51 @@ export default async function LeaguesPage() {
     redirect('/login');
   }
 
-  const leagues = db()
+  const rows = db()
     .prepare(
-      `select lm.role, l.id, l.code, l.name
-       from league_members lm
-       join leagues l on l.id = lm.league_id
-       where lm.user_id = ?
-       order by lm.joined_at desc`
+      `select
+         l.id,
+         l.code,
+         l.name,
+         l.owner_id,
+         lm.role as member_role,
+         ljr.status as join_status
+       from leagues l
+       left join league_members lm
+         on lm.league_id = l.id and lm.user_id = ?
+       left join league_join_requests ljr
+         on ljr.league_id = l.id and ljr.user_id = ?
+       order by l.created_at desc`
     )
-    .all(user.id) as any[];
+    .all(user.id, user.id) as any[];
+
+  const yourLeagues = rows.filter((r) => r.member_role);
+  const otherLeagues = rows.filter((r) => !r.member_role);
+
+  async function requestJoin(formData: FormData) {
+    'use server';
+    const u = await requireUser();
+    const leagueId = String(formData.get('league_id') ?? '');
+    if (!leagueId) return;
+    requestToJoinLeague(u.id, leagueId);
+    const { publishEvent } = await import('@/lib/events');
+    publishEvent('join_requests_updated', { leagueId, at: new Date().toISOString() });
+  }
 
   return (
     <main className="app-bg">
+      <LiveUpdates />
       <div className="shell">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="mono text-xs muted">Welcome, {user.nickname}</div>
-            <h1 className="text-4xl leading-none h-display">Your Leagues</h1>
-            <p className="mt-2 text-sm muted">Create a league, hand out the invite code, and start picking.</p>
+            <h1 className="text-4xl leading-none h-display">Leagues</h1>
+            <p className="mt-2 text-sm muted">All leagues on this host. Join by code or request access.</p>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Link className="btn" href="/join">
-              Join
+              Join by code
             </Link>
             <Link className="btn btn-primary" href="/leagues/new">
               New league
@@ -50,28 +74,61 @@ export default async function LeaguesPage() {
         </div>
 
         <div className="mt-8 grid gap-3">
-        {leagues.map((row: any) => (
-          <Link
-            key={row.id}
-            href={`/league/${row.code}`}
-            className="card-solid p-4 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-lg font-semibold">{row.name}</div>
-                <div className="mt-1 mono text-xs muted">Invite: {row.code}</div>
+          <div className="mono text-xs muted">YOUR LEAGUES</div>
+          {yourLeagues.map((row: any) => (
+            <Link
+              key={row.id}
+              href={`/league/${row.code}`}
+              className="card-solid p-4 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-lg font-semibold">{row.name}</div>
+                  <div className="mt-1 mono text-xs muted">Invite: {row.code}</div>
+                </div>
+                <div className="mono text-xs muted">{row.member_role}</div>
               </div>
-              <div className="mono text-xs muted">{row.role}</div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          ))}
 
-        {leagues.length === 0 ? (
-          <div className="card-solid p-5 text-sm">
-            <div className="font-semibold">No leagues yet</div>
-            <div className="mt-1 muted">Create one, then share the invite code with your friends.</div>
-          </div>
-        ) : null}
+          {yourLeagues.length === 0 ? (
+            <div className="card-solid p-5 text-sm">
+              <div className="font-semibold">No leagues joined</div>
+              <div className="mt-1 muted">Join by invite code, or request access from the list below.</div>
+            </div>
+          ) : null}
+
+          <div className="mt-6 mono text-xs muted">ALL LEAGUES</div>
+          {otherLeagues.map((row: any) => {
+            const status = row.join_status as string | null;
+            const disabled = status === 'pending' || status === 'approved';
+            const label = status === 'pending' ? 'Requested' : status === 'approved' ? 'Approved' : 'Request to join';
+
+            return (
+              <div key={row.id} className="card-solid p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-semibold">{row.name}</div>
+                    <div className="mt-1 mono text-xs muted">Invite: {row.code}</div>
+                  </div>
+                  <form action={requestJoin}>
+                    <input type="hidden" name="league_id" value={row.id} />
+                    <button className={`btn ${disabled ? '' : 'btn-primary'} disabled:opacity-50`} type="submit" disabled={disabled}>
+                      {label}
+                    </button>
+                  </form>
+                </div>
+                <div className="mt-2 text-sm muted">Not a member. Use invite code to join instantly, or request access.</div>
+              </div>
+            );
+          })}
+
+          {rows.length === 0 ? (
+            <div className="card-solid p-5 text-sm">
+              <div className="font-semibold">No leagues exist yet</div>
+              <div className="mt-1 muted">Create the first league to get started.</div>
+            </div>
+          ) : null}
         </div>
       </div>
     </main>
