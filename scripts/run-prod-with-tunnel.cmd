@@ -9,6 +9,7 @@ cd /d "%~dp0.."
 set PORT=3210
 set HOSTNAME=0.0.0.0
 set ENABLE_BACKGROUND_JOBS=1
+set APP_DATA_DIR=%LOCALAPPDATA%\F1Predictions\data
 
 if not exist "node_modules\next\package.json" (
   echo.
