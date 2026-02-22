@@ -51,6 +51,14 @@ Key paths:
 - Output ends up in `dist/`.
 - On first run, register the host account, then set the Cloudflare Tunnel token at `/settings`.
 
+### Auto-apply changes after `git pull`
+- If this repo has an upstream configured, use:
+  - `scripts/run-prod-auto-update.cmd`
+- It will:
+  - keep the server running
+  - poll for remote updates
+  - `git pull --ff-only`, rebuild, and restart automatically
+
 Data source:
 - Default: `https://api.jolpi.ca/ergast` (Ergast-compatible)
 
