@@ -14,6 +14,8 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
   if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/season`)}`);
   if (!league) return notFound();
 
+  const selfHref = `/league/${p.code}/season`;
+
   const seasonYear = new Date().getUTCFullYear();
 
   const drivers = db()
@@ -80,7 +82,7 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
 
     const freshRace1 = db().prepare('select race_start from races where season_year = ? and round = 1').get(seasonYear) as any;
     const freshLockAt = freshRace1?.race_start ? new Date(String(freshRace1.race_start)) : null;
-    if (freshLockAt && freshLockAt.getTime() <= Date.now()) return;
+    if (freshLockAt && freshLockAt.getTime() <= Date.now()) redirect(selfHref);
 
     const wdc: Record<string, string> = {};
     const wcc: Record<string, string> = {};
@@ -117,6 +119,8 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
       random_json: JSON.stringify(random),
       submitted_at: new Date().toISOString(),
     });
+
+    redirect(selfHref);
   }
 
   return (

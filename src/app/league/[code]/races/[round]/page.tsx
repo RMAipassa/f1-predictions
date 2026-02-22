@@ -20,6 +20,8 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
   const round = Number(p.round);
   if (!Number.isFinite(round)) return notFound();
 
+  const selfHref = `/league/${p.code}/races/${p.round}`;
+
   const { league, user } = await getLeagueByCode(p.code);
   if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/races/${p.round}`)}`);
   if (!league) return notFound();
@@ -91,7 +93,7 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
     const freshRace = db().prepare('select race_start from races where season_year = ? and round = ?').get(seasonYear, round) as any;
     const freshLockAt = freshRace?.race_start ? new Date(String(freshRace.race_start)) : null;
     if (freshLockAt && freshLockAt.getTime() <= Date.now()) {
-      return;
+      redirect(selfHref);
     }
 
     const payload = {
@@ -116,6 +118,8 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
          p3_driver_id=excluded.p3_driver_id,
          submitted_at=excluded.submitted_at`
     ).run(payload);
+
+    redirect(selfHref);
   }
 
   return (
