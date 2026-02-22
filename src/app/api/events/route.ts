@@ -8,27 +8,37 @@ function encodeSse(event: string, data: any) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   // Require auth cookie so only your group can listen.
   await requireUser();
 
+  const enc = new TextEncoder();
+  let cleanup: (() => void) | null = null;
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const enc = new TextEncoder();
-      controller.enqueue(enc.encode(encodeSse('hello', { ok: true })));
+      let closed = false;
+      let unsubscribe = () => {};
+      let keepAlive: ReturnType<typeof setInterval> | null = null;
 
-      const unsubscribe = subscribeEvents(({ type, data }) => {
-        controller.enqueue(enc.encode(encodeSse(type, data)));
-      });
-
-      const keepAlive = setInterval(() => {
-        controller.enqueue(enc.encode(': keep-alive\n\n'));
-      }, 15000);
-
-      // @ts-ignore - underlying signal is present in Node runtime
       const close = () => {
-        clearInterval(keepAlive);
-        unsubscribe();
+        if (closed) return;
+        closed = true;
+
+        if (keepAlive) {
+          try {
+            clearInterval(keepAlive);
+          } catch {
+            // ignore
+          }
+        }
+
+        try {
+          unsubscribe();
+        } catch {
+          // ignore
+        }
+
         try {
           controller.close();
         } catch {
@@ -36,13 +46,54 @@ export async function GET() {
         }
       };
 
-      // If the client disconnects, the controller will error; treat that as close.
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      controller.error = ((orig) => (err: any) => {
-        close();
-        // @ts-ignore
-        orig?.call(controller, err);
-      })(controller.error);
+      cleanup = () => {
+        if (closed) return;
+        closed = true;
+
+        if (keepAlive) {
+          try {
+            clearInterval(keepAlive);
+          } catch {
+            // ignore
+          }
+        }
+
+        try {
+          unsubscribe();
+        } catch {
+          // ignore
+        }
+      };
+
+      const send = (payload: string) => {
+        if (closed) return;
+        try {
+          controller.enqueue(enc.encode(payload));
+        } catch {
+          // Client likely disconnected; stop timers and listeners.
+          close();
+        }
+      };
+
+      send(encodeSse('hello', { ok: true }));
+
+      unsubscribe = subscribeEvents(({ type, data }) => {
+        send(encodeSse(type, data));
+      });
+
+      keepAlive = setInterval(() => {
+        send(': keep-alive\n\n');
+      }, 15000);
+
+      // Abort fires when the client disconnects.
+      request.signal.addEventListener('abort', close, { once: true });
+    },
+    cancel() {
+      try {
+        cleanup?.();
+      } catch {
+        // ignore
+      }
     },
   });
 
