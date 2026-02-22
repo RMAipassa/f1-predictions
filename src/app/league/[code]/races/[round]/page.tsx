@@ -169,28 +169,32 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
 
       <div className="mt-6 grid gap-3 md:grid-cols-2">
         <div className="card-solid p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <div className="font-semibold">Certification</div>
-            <div className="mono text-xs muted">{result ? 'CERTIFIED' : 'PENDING'}</div>
-          </div>
-          {result ? (
-            <div className="mt-2 text-sm text-gray-700">
-              Results fetched: {new Date(result.fetched_at).toLocaleString()}
-              <div className="mt-2">
-                Pole: {result.pole_driver_id ?? '—'} | P1: {result.p1_driver_id ?? '—'} | P2: {result.p2_driver_id ?? '—'} | P3:{' '}
-                {result.p3_driver_id ?? '—'}
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="font-semibold">Certification</div>
+              <div className="mono text-xs muted">{result ? 'CERTIFIED' : 'PENDING'}</div>
+            </div>
+            {result ? (
+              <div className="mt-2 text-sm text-gray-700">
+                Results fetched: {new Date(result.fetched_at).toLocaleString()}
+                <div className="mt-2">
+                  Pole: {result.pole_driver_id ?? '—'} | P1: {result.p1_driver_id ?? '—'} | P2: {result.p2_driver_id ?? '—'} | P3:{' '}
+                  {result.p3_driver_id ?? '—'}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="mt-2 text-sm muted">
+            ) : (
+              <div className="mt-2 text-sm muted">
               No results yet. League owner can sync in{' '}
-              <Link className="underline underline-offset-4" href={`/league/${league.code}/admin`}>
-                admin
-              </Link>
+              {String(league.owner_id) === user.id ? (
+                <Link className="underline underline-offset-4" href={`/league/${league.code}/admin`}>
+                  admin
+                </Link>
+              ) : (
+                <span className="mono">admin</span>
+              )}
               .
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
 
         <div className="card-solid p-5">
           <div className="font-semibold">Your points</div>

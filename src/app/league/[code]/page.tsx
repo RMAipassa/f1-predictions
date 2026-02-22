@@ -65,11 +65,16 @@ export default async function LeaguePage({ params }: { params: Promise<{ code: s
             <div className="mt-1 text-lg font-semibold">Leaderboard</div>
             <div className="mt-1 text-sm muted">Race points + manual random points.</div>
           </Link>
-          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/admin`}>
-            <div className="mono text-xs muted">Tools</div>
-            <div className="mt-1 text-lg font-semibold">Admin</div>
-            <div className="mt-1 text-sm muted">Sync season + results.</div>
-          </Link>
+          {isOwner ? (
+            <Link
+              className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]"
+              href={`/league/${league.code}/admin`}
+            >
+              <div className="mono text-xs muted">Tools</div>
+              <div className="mt-1 text-lg font-semibold">Admin</div>
+              <div className="mt-1 text-sm muted">Sync season + results.</div>
+            </Link>
+          ) : null}
         </div>
       </div>
     </main>

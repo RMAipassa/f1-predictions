@@ -10,6 +10,8 @@ export default async function LeagueRacesPage({ params }: { params: Promise<{ co
   if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/races`)}`);
   if (!league) return notFound();
 
+  const isOwner = String(league.owner_id) === user.id;
+
   const seasonYear = new Date().getUTCFullYear();
   const races = db()
     .prepare('select season_year, round, name, race_start from races where season_year = ? order by round asc')
@@ -26,11 +28,17 @@ export default async function LeagueRacesPage({ params }: { params: Promise<{ co
             <div className="mono text-xs muted">Race Weekend</div>
             <h1 className="text-5xl leading-none h-display">Races</h1>
             <p className="mt-2 text-sm muted">
-              If this list is empty, sync season data in{' '}
-              <Link className="underline underline-offset-4" href={`/league/${league.code}/admin`}>
-                admin
-              </Link>
-              .
+              If this list is empty, {isOwner ? (
+                <>
+                  sync season data in{' '}
+                  <Link className="underline underline-offset-4" href={`/league/${league.code}/admin`}>
+                    admin
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>ask the league owner to sync season data.</>
+              )}
             </p>
           </div>
           <Link className="btn" href={`/league/${league.code}`}>
