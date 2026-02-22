@@ -1,0 +1,7 @@
+tunnel: <TUNNEL-UUID>
+credentials-file: C:\Users\<you>\.cloudflared\<TUNNEL-UUID>.json
+
+ingress:
+  - hostname: f1.rubyruben.nl
+    service: http://localhost:3210
+  - service: http_status:404
