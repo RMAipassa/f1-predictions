@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getCurrentUser, signIn } from '@/lib/auth';
+import { getCurrentUser, signInWithOptions } from '@/lib/auth';
 
 export default async function LoginPage({
   searchParams,
@@ -17,7 +17,8 @@ export default async function LoginPage({
     'use server';
     const nickname = String(formData.get('nickname') ?? '');
     const password = String(formData.get('password') ?? '');
-    const res = await signIn(nickname, password);
+    const remember = String(formData.get('remember') ?? '') === 'on';
+    const res = await signInWithOptions(nickname, password, { remember });
     if (!res.ok) redirect(`/login?error=invalid&next=${encodeURIComponent(next)}`);
     redirect(next);
   }
@@ -39,6 +40,10 @@ export default async function LoginPage({
           <label className="block">
             <div className="text-sm font-semibold">Password</div>
             <input className="mt-1 w-full field" name="password" type="password" autoComplete="current-password" required />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="remember" defaultChecked />
+            <span className="muted">Remember me on this device</span>
           </label>
           <button className="w-full btn btn-primary" type="submit">
             Sign in

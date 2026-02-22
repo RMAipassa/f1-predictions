@@ -77,22 +77,36 @@ export async function signOut() {
 }
 
 export async function signIn(nickname: string, password: string) {
+  return signInWithOptions(nickname, password, {});
+}
+
+export async function signInWithOptions(
+  nickname: string,
+  password: string,
+  opts: { remember?: boolean } = {}
+) {
   const nick = normalizeNick(nickname);
   const userRow = db().prepare('select id, password_hash from users where nickname = ?').get(nick) as any;
   if (!userRow) return { ok: false as const, error: 'invalid_login' };
   if (!verifyPassword(password, String(userRow.password_hash))) return { ok: false as const, error: 'invalid_login' };
 
+  const remember = Boolean(opts.remember);
   const token = randomId(24);
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
+  const ttlMs = remember ? 1000 * 60 * 60 * 24 * 30 : 1000 * 60 * 60 * 24;
+  const expiresAt = new Date(Date.now() + ttlMs).toISOString();
   db().prepare('insert into sessions (token, user_id, expires_at) values (?,?,?)').run(token, String(userRow.id), expiresAt);
 
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, token, {
+  const cookie: Parameters<typeof cookieStore.set>[2] = {
     httpOnly: true,
     path: '/',
     sameSite: 'lax',
-    secure: false,
-  });
+    secure: process.env.NODE_ENV === 'production',
+  };
+  if (remember) {
+    cookie.maxAge = Math.floor(ttlMs / 1000);
+  }
+  cookieStore.set(SESSION_COOKIE, token, cookie);
 
   return { ok: true as const };
 }

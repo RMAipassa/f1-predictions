@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getCurrentUser, registerUser, signIn } from '@/lib/auth';
+import { getCurrentUser, registerUser, signInWithOptions } from '@/lib/auth';
 
 export default async function RegisterPage() {
   const user = await getCurrentUser();
@@ -16,7 +16,7 @@ export default async function RegisterPage() {
       redirect(`/register?error=${encodeURIComponent(res.error)}`);
     }
 
-    const sign = await signIn(nickname, password);
+    const sign = await signInWithOptions(nickname, password, { remember: true });
     if (!sign.ok) redirect('/login');
     redirect('/leagues');
   }
