@@ -4,6 +4,9 @@ import { getLeagueByCode } from '@/lib/league';
 import { db } from '@/lib/db';
 import LiveUpdates from '@/components/LiveUpdates';
 
+const WDC_SLOTS = 22;
+const WCC_SLOTS = 11;
+
 function scoreRacePick(pred: any, result: any) {
   if (!pred || !result) return { points: 0, breakdown: { pole: 0, p1: 0, p2: 0, p3: 0 } };
   const pole = pred.pole_driver_id && result.pole_driver_id && pred.pole_driver_id === result.pole_driver_id ? 1 : 0;
@@ -123,8 +126,8 @@ export default async function MemberPredictionsPage({
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <div className="card p-4">
                 <div className="mono text-xs muted">WDC</div>
-                <div className="mt-2 grid gap-1 text-sm">
-                  {Array.from({ length: 10 }).map((_, i) => {
+                <div className="mt-2 grid gap-1 text-sm md:grid-cols-2">
+                  {Array.from({ length: WDC_SLOTS }).map((_, i) => {
                     const pos = i + 1;
                     const id = wdc?.[`p${pos}`];
                     const label = id ? driverLabelById.get(String(id)) ?? String(id) : '—';
@@ -140,7 +143,7 @@ export default async function MemberPredictionsPage({
               <div className="card p-4">
                 <div className="mono text-xs muted">WCC</div>
                 <div className="mt-2 grid gap-1 text-sm">
-                  {Array.from({ length: 5 }).map((_, i) => {
+                  {Array.from({ length: WCC_SLOTS }).map((_, i) => {
                     const pos = i + 1;
                     const id = wcc?.[`p${pos}`];
                     const label = id ? constructorLabelById.get(String(id)) ?? String(id) : '—';
