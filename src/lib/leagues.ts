@@ -109,3 +109,19 @@ export function decideJoinRequest(ownerUserId: string, leagueId: string, userId:
   });
   tx();
 }
+
+export function leaveLeague(userId: string, leagueId: string) {
+  const league = db().prepare('select owner_id from leagues where id = ?').get(leagueId) as any;
+  if (!league) throw new Error('league_not_found');
+  if (String(league.owner_id) === userId) throw new Error('owner_cannot_leave');
+
+  db().prepare('delete from league_members where league_id = ? and user_id = ?').run(leagueId, userId);
+}
+
+export function deleteLeague(ownerUserId: string, leagueId: string) {
+  const league = db().prepare('select owner_id from leagues where id = ?').get(leagueId) as any;
+  if (!league) throw new Error('league_not_found');
+  if (String(league.owner_id) !== ownerUserId) throw new Error('not_owner');
+
+  db().prepare('delete from leagues where id = ?').run(leagueId);
+}

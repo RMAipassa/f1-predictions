@@ -19,6 +19,7 @@ export default function LiveUpdates() {
       es.addEventListener('season_data_updated', refresh);
       es.addEventListener('random_reviews_updated', refresh);
       es.addEventListener('join_requests_updated', refresh);
+      es.addEventListener('leagues_updated', refresh);
 
       es.addEventListener('error', () => {
         try {

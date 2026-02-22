@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { getLeagueByCode } from '@/lib/league';
 import { syncCompletedRaceResults, syncSeasonData } from '@/lib/f1/sync';
 import { db } from '@/lib/db';
-import { decideJoinRequest } from '@/lib/leagues';
+import { decideJoinRequest, deleteLeague } from '@/lib/leagues';
 
 export default async function LeagueAdminPage({ params }: { params: Promise<{ code: string }> }) {
   const p = await params;
@@ -48,6 +48,16 @@ export default async function LeagueAdminPage({ params }: { params: Promise<{ co
 
     const { publishEvent } = await import('@/lib/events');
     publishEvent('join_requests_updated', { leagueId, at: new Date().toISOString() });
+  }
+
+  async function del() {
+    'use server';
+    const { user: u, league: l, member: m } = await getLeagueByCode(p.code);
+    if (!u || !l || !m || m.role !== 'owner') return;
+    deleteLeague(u.id, String(l.id));
+    const { publishEvent } = await import('@/lib/events');
+    publishEvent('leagues_updated', { leagueId: String(l.id), at: new Date().toISOString() });
+    redirect('/leagues');
   }
 
   return (
@@ -115,6 +125,17 @@ export default async function LeagueAdminPage({ params }: { params: Promise<{ co
                 <div className="mt-1 muted">When someone taps “Request to join”, it will appear here.</div>
               </div>
             ) : null}
+          </div>
+        </div>
+
+        <div className="mt-10">
+          <div className="mono text-xs muted">DANGER ZONE</div>
+          <div className="mt-3 card-solid p-5">
+            <div className="text-lg font-semibold">Delete league</div>
+            <div className="mt-1 text-sm muted">This removes the league and all its predictions/results for all members.</div>
+            <form action={del} className="mt-4">
+              <button className="btn" type="submit">Delete permanently</button>
+            </form>
           </div>
         </div>
       </div>

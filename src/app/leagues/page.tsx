@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { requestToJoinLeague } from '@/lib/leagues';
+import { leaveLeague, requestToJoinLeague } from '@/lib/leagues';
 import LiveUpdates from '@/components/LiveUpdates';
 
 export default async function LeaguesPage() {
@@ -44,6 +44,16 @@ export default async function LeaguesPage() {
     publishEvent('join_requests_updated', { leagueId, at: new Date().toISOString() });
   }
 
+  async function leave(formData: FormData) {
+    'use server';
+    const u = await requireUser();
+    const leagueId = String(formData.get('league_id') ?? '');
+    if (!leagueId) return;
+    leaveLeague(u.id, leagueId);
+    const { publishEvent } = await import('@/lib/events');
+    publishEvent('leagues_updated', { leagueId, at: new Date().toISOString() });
+  }
+
   return (
     <main className="app-bg">
       <LiveUpdates />
@@ -76,19 +86,28 @@ export default async function LeaguesPage() {
         <div className="mt-8 grid gap-3">
           <div className="mono text-xs muted">YOUR LEAGUES</div>
           {yourLeagues.map((row: any) => (
-            <Link
-              key={row.id}
-              href={`/league/${row.code}`}
-              className="card-solid p-4 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]"
-            >
-              <div className="flex items-center justify-between gap-3">
+            <div key={row.id} className="card-solid p-4">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-lg font-semibold">{row.name}</div>
                   <div className="mt-1 mono text-xs muted">Invite: {row.code}</div>
                 </div>
-                <div className="mono text-xs muted">{row.member_role}</div>
+                <div className="flex items-center gap-2">
+                  <Link className="btn" href={`/league/${row.code}`}>
+                    Open
+                  </Link>
+                  {row.member_role === 'member' ? (
+                    <form action={leave}>
+                      <input type="hidden" name="league_id" value={row.id} />
+                      <button className="btn" type="submit">
+                        Leave
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
               </div>
-            </Link>
+              <div className="mt-2 text-sm muted">Role: <span className="mono">{row.member_role}</span></div>
+            </div>
           ))}
 
           {yourLeagues.length === 0 ? (
@@ -109,7 +128,7 @@ export default async function LeaguesPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-lg font-semibold">{row.name}</div>
-                    <div className="mt-1 mono text-xs muted">Invite: {row.code}</div>
+                    <div className="mt-1 mono text-xs muted">Private league</div>
                   </div>
                   <form action={requestJoin}>
                     <input type="hidden" name="league_id" value={row.id} />
