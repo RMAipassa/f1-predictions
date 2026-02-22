@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getLeagueByCode } from '@/lib/league';
 import { db } from '@/lib/db';
 import LiveUpdates from '@/components/LiveUpdates';
+import UniqueRaceSelects from '@/components/UniqueRaceSelects';
 
 function scoreRacePick(pred: any, result: any) {
   if (!pred || !result) return { points: 0, breakdown: { pole: 0, p1: 0, p2: 0, p3: 0 } };
@@ -102,34 +103,28 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
         </div>
 
         <form action={save} className="mt-8 grid gap-3 card-solid p-5">
-        <Select
-          name="pole_driver_id"
-          label="Pole"
-          disabled={locked}
-          drivers={drivers ?? []}
-          defaultValue={pred?.pole_driver_id ?? ''}
-        />
-        <Select
-          name="p1_driver_id"
-          label="P1"
-          disabled={locked}
-          drivers={drivers ?? []}
-          defaultValue={pred?.p1_driver_id ?? ''}
-        />
-        <Select
-          name="p2_driver_id"
-          label="P2"
-          disabled={locked}
-          drivers={drivers ?? []}
-          defaultValue={pred?.p2_driver_id ?? ''}
-        />
-        <Select
-          name="p3_driver_id"
-          label="P3"
-          disabled={locked}
-          drivers={drivers ?? []}
-          defaultValue={pred?.p3_driver_id ?? ''}
-        />
+          <UniqueRaceSelects
+            disabled={locked}
+            drivers={drivers ?? []}
+            fields={[
+              { name: 'pole_driver_id', label: 'Pole' },
+              { name: 'p1_driver_id', label: 'P1' },
+              { name: 'p2_driver_id', label: 'P2' },
+              { name: 'p3_driver_id', label: 'P3' },
+            ]}
+            uniqueGroup={{
+              pole_driver_id: 'quali',
+              p1_driver_id: 'race',
+              p2_driver_id: 'race',
+              p3_driver_id: 'race',
+            }}
+            initial={{
+              pole_driver_id: pred?.pole_driver_id ?? '',
+              p1_driver_id: pred?.p1_driver_id ?? '',
+              p2_driver_id: pred?.p2_driver_id ?? '',
+              p3_driver_id: pred?.p3_driver_id ?? '',
+            }}
+          />
         <button className={`btn ${locked ? '' : 'btn-primary'} disabled:opacity-50`} type="submit" disabled={locked}>
           {locked ? 'Locked' : 'Save picks'}
         </button>
@@ -177,38 +172,5 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
       </div>
       </div>
     </main>
-  );
-}
-
-function Select({
-  name,
-  label,
-  drivers,
-  defaultValue,
-  disabled,
-}: {
-  name: string;
-  label: string;
-  drivers: any[];
-  defaultValue: string;
-  disabled: boolean;
-}) {
-  return (
-    <label className="block">
-      <div className="text-sm font-semibold">{label}</div>
-      <select
-        className="mt-1 w-full field"
-        name={name}
-        defaultValue={defaultValue}
-        disabled={disabled}
-      >
-        <option value="">—</option>
-        {drivers.map((d) => (
-          <option key={d.driver_id} value={d.driver_id}>
-            {d.family_name}, {d.given_name} {d.code ? `(${d.code})` : ''}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }

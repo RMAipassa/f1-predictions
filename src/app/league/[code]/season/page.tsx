@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getLeagueByCode } from '@/lib/league';
 import { db } from '@/lib/db';
 import LiveUpdates from '@/components/LiveUpdates';
+import UniqueRankedSelects from '@/components/UniqueRankedSelects';
 
 const WDC_SLOTS = 22;
 const WCC_SLOTS = 11;
@@ -108,24 +109,22 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
               <h2 className="text-2xl h-display">WDC</h2>
               <div className="mono text-xs muted">+1 PER EXACT SPOT</div>
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {Array.from({ length: WDC_SLOTS }).map((_, idx) => {
-              const p = idx + 1;
-              const key = `p${p}`;
-              return (
-                <Select
-                  key={key}
-                  name={`wdc_p${p}`}
-                  label={`P${p}`}
-                  disabled={locked}
-                  options={drivers.map((d: any) => ({
-                    value: d.driver_id,
-                    label: `${d.family_name}, ${d.given_name}${d.code ? ` (${d.code})` : ''}`,
-                  }))}
-                  defaultValue={(pred?.wdc as any)?.[key] ?? ''}
-                />
-              );
-            })}
+            <div className="mt-4">
+              <UniqueRankedSelects
+                prefix="wdc_p"
+                slots={WDC_SLOTS}
+                disabled={locked}
+                options={drivers.map((d: any) => ({
+                  value: d.driver_id,
+                  label: `${d.family_name}, ${d.given_name}${d.code ? ` (${d.code})` : ''}`,
+                }))}
+                initial={Object.fromEntries(
+                  Array.from({ length: WDC_SLOTS }).map((_, i) => {
+                    const p = i + 1;
+                    return [`wdc_p${p}`, (pred?.wdc as any)?.[`p${p}`] ?? ''];
+                  })
+                )}
+              />
             </div>
           </section>
 
@@ -134,21 +133,19 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
               <h2 className="text-2xl h-display">WCC</h2>
               <div className="mono text-xs muted">+1 PER EXACT SPOT</div>
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {Array.from({ length: WCC_SLOTS }).map((_, idx) => {
-              const p = idx + 1;
-              const key = `p${p}`;
-              return (
-                <Select
-                  key={key}
-                  name={`wcc_p${p}`}
-                  label={`P${p}`}
-                  disabled={locked}
-                  options={constructors.map((c: any) => ({ value: c.constructor_id, label: c.name }))}
-                  defaultValue={(pred?.wcc as any)?.[key] ?? ''}
-                />
-              );
-            })}
+            <div className="mt-4">
+              <UniqueRankedSelects
+                prefix="wcc_p"
+                slots={WCC_SLOTS}
+                disabled={locked}
+                options={constructors.map((c: any) => ({ value: c.constructor_id, label: c.name }))}
+                initial={Object.fromEntries(
+                  Array.from({ length: WCC_SLOTS }).map((_, i) => {
+                    const p = i + 1;
+                    return [`wcc_p${p}`, (pred?.wcc as any)?.[`p${p}`] ?? ''];
+                  })
+                )}
+              />
             </div>
           </section>
 
@@ -192,33 +189,5 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
         </form>
       </div>
     </main>
-  );
-}
-
-function Select({
-  name,
-  label,
-  options,
-  defaultValue,
-  disabled,
-}: {
-  name: string;
-  label: string;
-  options: { value: string; label: string }[];
-  defaultValue: string;
-  disabled: boolean;
-}) {
-  return (
-    <label className="block">
-      <div className="text-sm font-semibold">{label}</div>
-      <select className="mt-1 w-full field" name={name} defaultValue={defaultValue} disabled={disabled}>
-        <option value="">—</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
