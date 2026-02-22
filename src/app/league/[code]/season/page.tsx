@@ -38,6 +38,39 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
 
   const lockAt = race1?.race_start ? new Date(String(race1.race_start)) : null;
   const locked = lockAt ? lockAt.getTime() <= Date.now() : false;
+  const canViewOthers = locked || String(league.owner_id) === user.id;
+
+  const driverLabelById = new Map<string, string>();
+  for (const d of drivers ?? []) {
+    driverLabelById.set(
+      String(d.driver_id),
+      `${d.family_name}, ${d.given_name}${d.code ? ` (${d.code})` : ''}`
+    );
+  }
+  const constructorLabelById = new Map<string, string>();
+  for (const c of constructors ?? []) constructorLabelById.set(String(c.constructor_id), String(c.name));
+
+  const memberSeason = canViewOthers
+    ? (db()
+        .prepare(
+          `select
+             lm.user_id,
+             u.nickname,
+             sp.wdc_json,
+             sp.wcc_json,
+             sp.random_json,
+             sp.submitted_at
+           from league_members lm
+           join users u on u.id = lm.user_id
+           left join season_predictions sp
+             on sp.league_id = lm.league_id
+            and sp.user_id = lm.user_id
+            and sp.season_year = ?
+           where lm.league_id = ?
+           order by u.nickname asc`
+        )
+        .all(seasonYear, String(league.id)) as any[])
+    : [];
 
   async function save(formData: FormData) {
     'use server';
@@ -187,6 +220,90 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
             {locked ? 'Locked' : 'Save season predictions'}
           </button>
         </form>
+
+        <div className="mt-10 card-solid p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="font-semibold">Other predictions</div>
+            <div className="mono text-xs muted">{canViewOthers ? 'VISIBLE' : 'LOCKED'}</div>
+          </div>
+
+          {!canViewOthers ? (
+            <div className="mt-2 text-sm muted">Other season picks become visible once the season locks.</div>
+          ) : (
+            <div className="mt-4 grid gap-3">
+              {memberSeason
+                .filter((m) => String(m.user_id) !== user.id)
+                .map((m) => {
+                  const wdc = m.wdc_json ? JSON.parse(String(m.wdc_json)) : {};
+                  const wcc = m.wcc_json ? JSON.parse(String(m.wcc_json)) : {};
+                  const random = m.random_json ? JSON.parse(String(m.random_json)) : {};
+
+                  const wdcTop = Array.from({ length: 10 }).map((_, i) => {
+                    const p = i + 1;
+                    const id = (wdc as any)[`p${p}`];
+                    return id ? driverLabelById.get(String(id)) ?? String(id) : '—';
+                  });
+
+                  const wccTop = Array.from({ length: Math.min(5, WCC_SLOTS) }).map((_, i) => {
+                    const p = i + 1;
+                    const id = (wcc as any)[`p${p}`];
+                    return id ? constructorLabelById.get(String(id)) ?? String(id) : '—';
+                  });
+
+                  return (
+                    <details key={m.user_id} className="card p-4">
+                      <summary className="cursor-pointer list-none">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-lg font-semibold">{m.nickname}</div>
+                            <div className="mt-1 text-sm muted">
+                              WDC top 3: <span className="mono">{wdcTop.slice(0, 3).join(' / ')}</span>
+                            </div>
+                          </div>
+                          <div className="mono text-xs muted">{m.submitted_at ? 'SUBMITTED' : '—'}</div>
+                        </div>
+                      </summary>
+
+                      <div className="mt-4 grid gap-4">
+                        <div>
+                          <div className="mono text-xs muted">WDC (Top 10)</div>
+                          <div className="mt-2 grid gap-1 text-sm">
+                            {wdcTop.map((label, idx) => (
+                              <div key={idx}>
+                                <span className="mono muted">P{idx + 1}</span> {label}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="mono text-xs muted">WCC (Top 5)</div>
+                          <div className="mt-2 grid gap-1 text-sm">
+                            {wccTop.map((label, idx) => (
+                              <div key={idx}>
+                                <span className="mono muted">P{idx + 1}</span> {label}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="mono text-xs muted">Random</div>
+                          <div className="mt-2 grid gap-1 text-sm">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                              <div key={i}>
+                                <span className="mono muted">R{i}</span> {(random as any)[`r${i}`] ?? '—'}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                  );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

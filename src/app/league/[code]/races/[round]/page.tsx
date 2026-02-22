@@ -48,6 +48,39 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
   const lockAt = race.race_start ? new Date(race.race_start) : null;
   const locked = lockAt ? lockAt.getTime() <= Date.now() : false;
   const scoring = result ? scoreRacePick(pred, result) : null;
+  const canViewOthers = locked || String(league.owner_id) === user.id;
+
+  const driverLabelById = new Map<string, string>();
+  for (const d of drivers ?? []) {
+    driverLabelById.set(
+      String(d.driver_id),
+      `${d.family_name}, ${d.given_name}${d.code ? ` (${d.code})` : ''}`
+    );
+  }
+
+  const allPicks = canViewOthers
+    ? (db()
+        .prepare(
+          `select
+             lm.user_id,
+             u.nickname,
+             rp.pole_driver_id,
+             rp.p1_driver_id,
+             rp.p2_driver_id,
+             rp.p3_driver_id,
+             rp.submitted_at
+           from league_members lm
+           join users u on u.id = lm.user_id
+           left join race_predictions rp
+             on rp.league_id = lm.league_id
+            and rp.user_id = lm.user_id
+            and rp.season_year = ?
+            and rp.round = ?
+           where lm.league_id = ?
+           order by u.nickname asc`
+        )
+        .all(seasonYear, round, String(league.id)) as any[])
+    : [];
 
   async function save(formData: FormData) {
     'use server';
@@ -169,6 +202,42 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
             <div className="mt-2 text-sm muted">Pending results.</div>
           )}
         </div>
+      </div>
+
+      <div className="mt-6 card-solid p-5">
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="font-semibold">All predictions</div>
+          <div className="mono text-xs muted">{canViewOthers ? 'VISIBLE' : 'LOCKED'}</div>
+        </div>
+
+        {!canViewOthers ? (
+          <div className="mt-2 text-sm muted">Other picks become visible once predictions lock.</div>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead style={{ background: 'rgba(16, 19, 24, 0.03)' }} className="text-left">
+                <tr>
+                  <th className="px-3 py-2">User</th>
+                  <th className="px-3 py-2">Pole</th>
+                  <th className="px-3 py-2">P1</th>
+                  <th className="px-3 py-2">P2</th>
+                  <th className="px-3 py-2">P3</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allPicks.map((r) => (
+                  <tr key={r.user_id} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                    <td className="px-3 py-2 font-medium">{r.nickname}</td>
+                    <td className="px-3 py-2">{r.pole_driver_id ? driverLabelById.get(String(r.pole_driver_id)) ?? r.pole_driver_id : '—'}</td>
+                    <td className="px-3 py-2">{r.p1_driver_id ? driverLabelById.get(String(r.p1_driver_id)) ?? r.p1_driver_id : '—'}</td>
+                    <td className="px-3 py-2">{r.p2_driver_id ? driverLabelById.get(String(r.p2_driver_id)) ?? r.p2_driver_id : '—'}</td>
+                    <td className="px-3 py-2">{r.p3_driver_id ? driverLabelById.get(String(r.p3_driver_id)) ?? r.p3_driver_id : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
       </div>
     </main>
