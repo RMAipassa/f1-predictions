@@ -1,7 +1,8 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Bebas_Neue, IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import './globals.css';
-import ThemeToggle from '@/components/ThemeToggle';
+import FloatingActions from '@/components/FloatingActions';
+import PwaRegister from '@/components/PwaRegister';
 
 const display = Bebas_Neue({
   weight: '400',
@@ -24,6 +25,28 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: 'F1 Predictions',
   description: 'Friends league predictions and scoring',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/pwa-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/pwa-icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'F1 Predictions',
+    statusBarStyle: 'default',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f7f5f0' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b0f14' },
+  ],
 };
 
 export default function RootLayout({
@@ -51,8 +74,9 @@ export default function RootLayout({
         />
       </head>
       <body className={`${display.variable} ${body.variable} ${mono.variable} antialiased`}>
+        <PwaRegister />
         {children}
-        <ThemeToggle />
+        <FloatingActions />
       </body>
     </html>
   );

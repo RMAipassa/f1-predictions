@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -19,18 +19,20 @@ function setTheme(theme: Theme) {
 }
 
 export default function ThemeToggle() {
-  const [theme, setThemeState] = useState<Theme>('light');
-
-  useEffect(() => {
-    setThemeState(getCurrentTheme());
-  }, []);
+  const [theme, setThemeState] = useState<Theme>(() => {
+    try {
+      return getCurrentTheme();
+    } catch {
+      return 'light';
+    }
+  });
 
   const next = theme === 'dark' ? 'light' : 'dark';
 
   return (
     <button
       type="button"
-      className="btn fixed bottom-4 right-4 z-50"
+      className="btn"
       onClick={() => {
         setTheme(next);
         setThemeState(next);

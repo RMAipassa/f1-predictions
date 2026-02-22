@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3210",
-    "build": "next build && node scripts/prepare-standalone.mjs",
+    "postinstall": "node scripts/generate-pwa-icons.mjs",
+    "build": "node scripts/generate-pwa-icons.mjs && next build && node scripts/prepare-standalone.mjs",
     "start": "node .next/standalone/server.js",
     "electron": "electron .",
     "predist": "node scripts/fetch-cloudflared.mjs",
