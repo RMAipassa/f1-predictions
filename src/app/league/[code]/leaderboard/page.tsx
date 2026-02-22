@@ -109,7 +109,12 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
             {rows.map((r) => (
               <tr key={r.user_id} className="border-t" style={{ borderColor: 'var(--border)' }}>
                 <td className="px-4 py-3">
-                  <div className="font-medium">{r.nickname}</div>
+                  <Link
+                    className="font-medium underline underline-offset-4"
+                    href={`/league/${league.code}/members/${r.user_id}`}
+                  >
+                    {r.nickname}
+                  </Link>
                   <div className="mono text-xs muted">{r.role}</div>
                 </td>
                 <td className="px-4 py-3 mono">{r.racePts}</td>
