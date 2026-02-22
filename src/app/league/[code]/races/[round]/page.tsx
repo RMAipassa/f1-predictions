@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getLeagueByCode } from '@/lib/league';
 import { db } from '@/lib/db';
+import LiveUpdates from '@/components/LiveUpdates';
 
 function scoreRacePick(pred: any, result: any) {
   if (!pred || !result) return { points: 0, breakdown: { pole: 0, p1: 0, p2: 0, p3: 0 } };
@@ -13,12 +14,13 @@ function scoreRacePick(pred: any, result: any) {
   return { points, breakdown: { pole, p1, p2, p3 } };
 }
 
-export default async function RaceRoundPage({ params }: { params: { code: string; round: string } }) {
-  const round = Number(params.round);
+export default async function RaceRoundPage({ params }: { params: Promise<{ code: string; round: string }> }) {
+  const p = await params;
+  const round = Number(p.round);
   if (!Number.isFinite(round)) return notFound();
 
-  const { league, user } = await getLeagueByCode(params.code);
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${params.code}/races/${params.round}`)}`);
+  const { league, user } = await getLeagueByCode(p.code);
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/races/${p.round}`)}`);
   if (!league) return notFound();
 
   const seasonYear = new Date().getUTCFullYear();
@@ -49,7 +51,7 @@ export default async function RaceRoundPage({ params }: { params: { code: string
   async function save(formData: FormData) {
     'use server';
 
-    const { league: freshLeague, user: freshUser } = await getLeagueByCode(params.code);
+    const { league: freshLeague, user: freshUser } = await getLeagueByCode(p.code);
     if (!freshLeague || !freshUser) return;
 
     const freshRace = db().prepare('select race_start from races where season_year = ? and round = ?').get(seasonYear, round) as any;
@@ -83,22 +85,23 @@ export default async function RaceRoundPage({ params }: { params: { code: string
   }
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            Round {race.round}: {race.name}
-          </h1>
-          <div className="mt-1 text-sm text-gray-600">
-            Lock: {lockAt ? lockAt.toLocaleString() : 'TBD'} ({locked ? 'locked' : 'open'})
+    <main className="app-bg">
+      <LiveUpdates />
+      <div className="shell max-w-3xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="mono text-xs muted">Round {race.round}</div>
+            <h1 className="text-5xl leading-none h-display">{race.name}</h1>
+            <div className="mt-2 text-sm muted">
+              Lock: <span className="mono">{lockAt ? lockAt.toLocaleString() : 'TBD'}</span> ({locked ? 'locked' : 'open'})
+            </div>
           </div>
+          <Link className="btn" href={`/league/${league.code}/races`}>
+            Back
+          </Link>
         </div>
-        <Link className="rounded-md border px-3 py-2 text-sm" href={`/league/${league.code}/races`}>
-          Back
-        </Link>
-      </div>
 
-      <form action={save} className="mt-6 grid gap-3 rounded-xl border bg-white p-4">
+        <form action={save} className="mt-8 grid gap-3 card-solid p-5">
         <Select
           name="pole_driver_id"
           label="Pole"
@@ -127,18 +130,17 @@ export default async function RaceRoundPage({ params }: { params: { code: string
           drivers={drivers ?? []}
           defaultValue={pred?.p3_driver_id ?? ''}
         />
-        <button
-          className="rounded-md bg-black px-3 py-2 text-white disabled:opacity-50"
-          type="submit"
-          disabled={locked}
-        >
-          {locked ? 'Locked' : 'Save'}
+        <button className={`btn ${locked ? '' : 'btn-primary'} disabled:opacity-50`} type="submit" disabled={locked}>
+          {locked ? 'Locked' : 'Save picks'}
         </button>
       </form>
 
-      <div className="mt-6 grid gap-3">
-        <div className="rounded-xl border bg-white p-4">
-          <div className="font-medium">Certification</div>
+      <div className="mt-6 grid gap-3 md:grid-cols-2">
+        <div className="card-solid p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="font-semibold">Certification</div>
+            <div className="mono text-xs muted">{result ? 'CERTIFIED' : 'PENDING'}</div>
+          </div>
           {result ? (
             <div className="mt-2 text-sm text-gray-700">
               Results fetched: {new Date(result.fetched_at).toLocaleString()}
@@ -148,9 +150,9 @@ export default async function RaceRoundPage({ params }: { params: { code: string
               </div>
             </div>
           ) : (
-            <div className="mt-2 text-sm text-gray-700">
+            <div className="mt-2 text-sm muted">
               No results yet. League owner can sync in{' '}
-              <Link className="underline" href={`/league/${league.code}/admin`}>
+              <Link className="underline underline-offset-4" href={`/league/${league.code}/admin`}>
                 admin
               </Link>
               .
@@ -158,16 +160,21 @@ export default async function RaceRoundPage({ params }: { params: { code: string
           )}
         </div>
 
-        <div className="rounded-xl border bg-white p-4">
-          <div className="font-medium">Your points</div>
+        <div className="card-solid p-5">
+          <div className="font-semibold">Your points</div>
           {scoring ? (
-            <div className="mt-2 text-sm text-gray-700">
-              Total: {scoring.points} (pole {scoring.breakdown.pole}, p1 {scoring.breakdown.p1}, p2 {scoring.breakdown.p2}, p3 {scoring.breakdown.p3})
+            <div className="mt-2 text-sm">
+              <span className="mono">TOTAL {scoring.points}</span>
+              <span className="muted">
+                {' '}
+                (pole {scoring.breakdown.pole}, p1 {scoring.breakdown.p1}, p2 {scoring.breakdown.p2}, p3 {scoring.breakdown.p3})
+              </span>
             </div>
           ) : (
-            <div className="mt-2 text-sm text-gray-700">Pending results.</div>
+            <div className="mt-2 text-sm muted">Pending results.</div>
           )}
         </div>
+      </div>
       </div>
     </main>
   );
@@ -188,9 +195,9 @@ function Select({
 }) {
   return (
     <label className="block">
-      <div className="text-sm font-medium">{label}</div>
+      <div className="text-sm font-semibold">{label}</div>
       <select
-        className="mt-1 w-full rounded-md border px-3 py-2"
+        className="mt-1 w-full field"
         name={name}
         defaultValue={defaultValue}
         disabled={disabled}

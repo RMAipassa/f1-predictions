@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getLeagueByCode } from '@/lib/league';
 import { db } from '@/lib/db';
+import LiveUpdates from '@/components/LiveUpdates';
 
 const WEIGHTS: Record<number, number> = { 1: 8, 2: 6, 3: 4, 4: 2, 5: 1 };
 
@@ -15,9 +16,10 @@ function scoreRace(pred: any, result: any) {
   return pts;
 }
 
-export default async function LeaderboardPage({ params }: { params: { code: string } }) {
-  const { league, user } = await getLeagueByCode(params.code);
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${params.code}/leaderboard`)}`);
+export default async function LeaderboardPage({ params }: { params: Promise<{ code: string }> }) {
+  const p = await params;
+  const { league, user } = await getLeagueByCode(p.code);
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/leaderboard`)}`);
   if (!league) return notFound();
 
   const seasonYear = new Date().getUTCFullYear();
@@ -79,20 +81,23 @@ export default async function LeaderboardPage({ params }: { params: { code: stri
   rows.sort((a, b) => b.total - a.total);
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Leaderboard</h1>
-          <div className="mt-1 text-sm text-gray-600">Season {seasonYear} (race + random)</div>
+    <main className="app-bg">
+      <LiveUpdates />
+      <div className="shell">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="mono text-xs muted">Season {seasonYear}</div>
+            <h1 className="text-5xl leading-none h-display">Leaderboard</h1>
+            <div className="mt-2 text-sm muted">Race points + manual random points.</div>
+          </div>
+          <Link className="btn" href={`/league/${league.code}`}>
+            Back
+          </Link>
         </div>
-        <Link className="rounded-md border px-3 py-2 text-sm" href={`/league/${league.code}`}>
-          Back
-        </Link>
-      </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left">
+        <div className="mt-8 overflow-hidden card-solid">
+          <table className="w-full text-sm">
+            <thead className="text-left" style={{ background: 'rgba(16, 19, 24, 0.03)' }}>
             <tr>
               <th className="px-4 py-3">User</th>
               <th className="px-4 py-3">Race</th>
@@ -102,22 +107,21 @@ export default async function LeaderboardPage({ params }: { params: { code: stri
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.user_id} className="border-t">
+              <tr key={r.user_id} className="border-t" style={{ borderColor: 'var(--border)' }}>
                 <td className="px-4 py-3">
                   <div className="font-medium">{r.nickname}</div>
-                  <div className="text-xs text-gray-600">{r.role}</div>
+                  <div className="mono text-xs muted">{r.role}</div>
                 </td>
-                <td className="px-4 py-3">{r.racePts}</td>
-                <td className="px-4 py-3">{r.randomPts}</td>
-                <td className="px-4 py-3 font-semibold">{r.total}</td>
+                <td className="px-4 py-3 mono">{r.racePts}</td>
+                <td className="px-4 py-3 mono">{r.randomPts}</td>
+                <td className="px-4 py-3 mono font-semibold">{r.total}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+        </div>
 
-      <div className="mt-3 text-xs text-gray-600">
-        WDC/WCC season scoring not shown yet (needs final standings).
+        <div className="mt-3 text-xs muted">WDC/WCC season scoring not shown yet (needs final standings).</div>
       </div>
     </main>
   );

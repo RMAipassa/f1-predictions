@@ -26,31 +26,40 @@ export default async function SettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <div className="flex items-center justify-between gap-4">
+    <main className="app-bg">
+      <div className="shell max-w-3xl">
+        <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Host settings</h1>
-          <div className="mt-1 text-sm text-gray-600">Public URL: https://{hostname}</div>
+          <div className="mono text-xs muted">Host</div>
+          <h1 className="text-5xl leading-none h-display">Settings</h1>
+          <div className="mt-2 text-sm muted">
+            Public URL: <span className="mono">https://{hostname}</span>
+          </div>
         </div>
-        <Link className="rounded-md border px-3 py-2 text-sm" href="/leagues">
+        <Link className="btn" href="/leagues">
           Back
         </Link>
       </div>
 
-      <div className="mt-6 rounded-xl border bg-white p-4 text-sm text-gray-700">
-        Cloudflare Tunnel token: {tokenSet ? 'set' : 'not set'}
-      </div>
+        <div className="mt-8 card-solid p-5 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-semibold">Cloudflare Tunnel</div>
+            <div className={`mono text-xs ${tokenSet ? '' : 'muted'}`}>{tokenSet ? 'TOKEN SET' : 'TOKEN MISSING'}</div>
+          </div>
+          <div className="mt-1 muted">If you run the tunnel yourself, you can ignore this.</div>
+        </div>
 
-      <form action={save} className="mt-4 grid gap-3 rounded-xl border bg-white p-4">
-        <label className="block">
-          <div className="text-sm font-medium">cloudflared token</div>
-          <textarea className="mt-1 w-full rounded-md border px-3 py-2" name="token" rows={4} placeholder="Paste the tunnel token here" />
-          <div className="mt-1 text-xs text-gray-600">App will start the tunnel on next launch.</div>
-        </label>
-        <button className="rounded-md bg-black px-3 py-2 text-white" type="submit">
-          Save
-        </button>
-      </form>
+        <form action={save} className="mt-4 grid gap-3 card-solid p-5">
+          <label className="block">
+            <div className="text-sm font-semibold">cloudflared token</div>
+            <textarea className="mt-1 w-full field mono" name="token" rows={4} placeholder="Paste the tunnel token here" />
+            <div className="mt-1 text-xs muted">App will start the tunnel on next launch (if you want it to).</div>
+          </label>
+          <button className="btn btn-primary" type="submit">
+            Save
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

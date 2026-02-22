@@ -2,13 +2,15 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getLeagueByCode } from '@/lib/league';
 import { db } from '@/lib/db';
+import LiveUpdates from '@/components/LiveUpdates';
 
 const WDC_SLOTS = 22;
 const WCC_SLOTS = 11;
 
-export default async function LeagueSeasonPredictionsPage({ params }: { params: { code: string } }) {
-  const { league, user } = await getLeagueByCode(params.code);
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${params.code}/season`)}`);
+export default async function LeagueSeasonPredictionsPage({ params }: { params: Promise<{ code: string }> }) {
+  const p = await params;
+  const { league, user } = await getLeagueByCode(p.code);
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/season`)}`);
   if (!league) return notFound();
 
   const seasonYear = new Date().getUTCFullYear();
@@ -39,7 +41,7 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
   async function save(formData: FormData) {
     'use server';
 
-    const { league: freshLeague, user: freshUser } = await getLeagueByCode(params.code);
+    const { league: freshLeague, user: freshUser } = await getLeagueByCode(p.code);
     if (!freshLeague || !freshUser) return;
 
     const freshRace1 = db().prepare('select race_start from races where season_year = ? and round = 1').get(seasonYear) as any;
@@ -84,26 +86,29 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
   }
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Season predictions</h1>
-          <div className="mt-1 text-sm text-gray-600">
-            Season {seasonYear}. Lock: {lockAt ? lockAt.toLocaleString() : 'Round 1 TBD'} ({locked ? 'locked' : 'open'})
+    <main className="app-bg">
+      <LiveUpdates />
+      <div className="shell">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="mono text-xs muted">Season {seasonYear}</div>
+            <h1 className="text-5xl leading-none h-display">Season Predictions</h1>
+            <div className="mt-2 text-sm muted">
+              Lock: <span className="mono">{lockAt ? lockAt.toLocaleString() : 'Round 1 TBD'}</span> ({locked ? 'locked' : 'open'})
+            </div>
           </div>
+          <Link className="btn" href={`/league/${league.code}`}>
+            Back
+          </Link>
         </div>
-        <Link className="rounded-md border px-3 py-2 text-sm" href={`/league/${league.code}`}>
-          Back
-        </Link>
-      </div>
 
-      <form action={save} className="mt-6 grid gap-6">
-        <section className="rounded-xl border bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">WDC</h2>
-            <div className="text-xs text-gray-600">+1 point per correct spot</div>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <form action={save} className="mt-8 grid gap-6">
+          <section className="card-solid p-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-2xl h-display">WDC</h2>
+              <div className="mono text-xs muted">+1 PER EXACT SPOT</div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {Array.from({ length: WDC_SLOTS }).map((_, idx) => {
               const p = idx + 1;
               const key = `p${p}`;
@@ -121,15 +126,15 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
                 />
               );
             })}
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section className="rounded-xl border bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">WCC</h2>
-            <div className="text-xs text-gray-600">+1 point per correct spot</div>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <section className="card-solid p-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-2xl h-display">WCC</h2>
+              <div className="mono text-xs muted">+1 PER EXACT SPOT</div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {Array.from({ length: WCC_SLOTS }).map((_, idx) => {
               const p = idx + 1;
               const key = `p${p}`;
@@ -144,15 +149,15 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
                 />
               );
             })}
-          </div>
-        </section>
+            </div>
+          </section>
 
-        <section className="rounded-xl border bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Random predictions</h2>
-            <div className="text-xs text-gray-600">Manual scoring: 8/6/4/2/1</div>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3">
+          <section className="card-solid p-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-2xl h-display">Random</h2>
+              <div className="mono text-xs muted">MANUAL: 8/6/4/2/1</div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3">
             {[
               { i: 1, pts: 8 },
               { i: 2, pts: 6 },
@@ -161,9 +166,9 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
               { i: 5, pts: 1 },
             ].map(({ i, pts }) => (
               <label key={i} className="block">
-                <div className="text-sm font-medium">Prediction {i} ({pts}pt)</div>
+                <div className="text-sm font-semibold">Prediction {i} ({pts}pt)</div>
                 <input
-                  className="mt-1 w-full rounded-md border px-3 py-2"
+                  className="mt-1 w-full field"
                   name={`random_${i}`}
                   defaultValue={(pred?.random as any)?.[`r${i}`] ?? ''}
                   disabled={locked}
@@ -172,19 +177,20 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
             ))}
           </div>
 
-          <div className="mt-4 text-sm text-gray-700">
+          <div className="mt-4 text-sm muted">
             League owner reviews these in{' '}
-            <Link className="underline" href={`/league/${league.code}/season/review`}>
+            <Link className="underline underline-offset-4" href={`/league/${league.code}/season/review`}>
               Random review
             </Link>
             .
           </div>
         </section>
 
-        <button className="rounded-md bg-black px-3 py-2 text-white disabled:opacity-50" type="submit" disabled={locked}>
-          {locked ? 'Locked' : 'Save season predictions'}
-        </button>
-      </form>
+          <button className={`btn ${locked ? '' : 'btn-primary'} disabled:opacity-50`} type="submit" disabled={locked}>
+            {locked ? 'Locked' : 'Save season predictions'}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
@@ -204,8 +210,8 @@ function Select({
 }) {
   return (
     <label className="block">
-      <div className="text-sm font-medium">{label}</div>
-      <select className="mt-1 w-full rounded-md border px-3 py-2" name={name} defaultValue={defaultValue} disabled={disabled}>
+      <div className="text-sm font-semibold">{label}</div>
+      <select className="mt-1 w-full field" name={name} defaultValue={defaultValue} disabled={disabled}>
         <option value="">—</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>

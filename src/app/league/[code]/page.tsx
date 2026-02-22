@@ -2,36 +2,50 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getLeagueByCode } from '@/lib/league';
 
-export default async function LeaguePage({ params }: { params: { code: string } }) {
-  const { league, user } = await getLeagueByCode(params.code);
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${params.code}`)}`);
+export default async function LeaguePage({ params }: { params: Promise<{ code: string }> }) {
+  const p = await params;
+  const { league, user } = await getLeagueByCode(p.code);
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}`)}`);
   if (!league) return notFound();
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{league.name}</h1>
-          <div className="mt-1 text-sm text-gray-600">Invite code: {league.code}</div>
+    <main className="app-bg">
+      <div className="shell">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="mono text-xs muted">League</div>
+            <h1 className="text-5xl leading-none h-display">{league.name}</h1>
+            <div className="mt-2 text-sm muted">
+              Invite code: <span className="mono">{league.code}</span>
+            </div>
+          </div>
+          <Link className="btn" href="/leagues">
+            Back
+          </Link>
         </div>
-        <Link className="rounded-md border px-3 py-2 text-sm" href="/leagues">
-          Back
-        </Link>
-      </div>
 
-      <div className="mt-6 grid gap-3">
-        <Link className="rounded-lg border bg-white p-4 hover:bg-gray-50" href={`/league/${league.code}/season`}>
-          Season predictions (WDC/WCC + random)
-        </Link>
-        <Link className="rounded-lg border bg-white p-4 hover:bg-gray-50" href={`/league/${league.code}/races`}>
-          Race predictions (pole + podium)
-        </Link>
-        <Link className="rounded-lg border bg-white p-4 hover:bg-gray-50" href={`/league/${league.code}/leaderboard`}>
-          Leaderboard
-        </Link>
-        <Link className="rounded-lg border bg-white p-4 hover:bg-gray-50" href={`/league/${league.code}/admin`}>
-          Admin (sync season + results)
-        </Link>
+        <div className="mt-8 grid gap-3 md:grid-cols-2">
+          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/season`}>
+            <div className="mono text-xs muted">Season</div>
+            <div className="mt-1 text-lg font-semibold">WDC / WCC + Random</div>
+            <div className="mt-1 text-sm muted">Locks at start of Race 1.</div>
+          </Link>
+          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/races`}>
+            <div className="mono text-xs muted">Race</div>
+            <div className="mt-1 text-lg font-semibold">Pole + Podium</div>
+            <div className="mt-1 text-sm muted">Auto-certified from results.</div>
+          </Link>
+          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/leaderboard`}>
+            <div className="mono text-xs muted">Points</div>
+            <div className="mt-1 text-lg font-semibold">Leaderboard</div>
+            <div className="mt-1 text-sm muted">Race points + manual random points.</div>
+          </Link>
+          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/admin`}>
+            <div className="mono text-xs muted">Tools</div>
+            <div className="mt-1 text-lg font-semibold">Admin</div>
+            <div className="mt-1 text-sm muted">Sync season + results.</div>
+          </Link>
+        </div>
       </div>
     </main>
   );

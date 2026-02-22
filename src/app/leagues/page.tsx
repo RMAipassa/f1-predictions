@@ -22,48 +22,57 @@ export default async function LeaguesPage() {
     .all(user.id) as any[];
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Your leagues</h1>
-        <div className="flex items-center gap-2">
-          <Link className="rounded-md border px-3 py-2 text-sm" href="/leagues/new">
-            New league
-          </Link>
-          <Link className="rounded-md border px-3 py-2 text-sm" href="/join">
-            Join
-          </Link>
-          <Link className="rounded-md border px-3 py-2 text-sm" href="/settings">
-            Settings
-          </Link>
-          <form action="/logout" method="post">
-            <button className="rounded-md bg-black px-3 py-2 text-sm text-white" type="submit">
-              Sign out
-            </button>
-          </form>
+    <main className="app-bg">
+      <div className="shell">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="mono text-xs muted">Welcome, {user.nickname}</div>
+            <h1 className="text-4xl leading-none h-display">Your Leagues</h1>
+            <p className="mt-2 text-sm muted">Create a league, hand out the invite code, and start picking.</p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link className="btn" href="/join">
+              Join
+            </Link>
+            <Link className="btn btn-primary" href="/leagues/new">
+              New league
+            </Link>
+            <Link className="btn" href="/settings">
+              Settings
+            </Link>
+            <form action="/logout" method="post">
+              <button className="btn btn-dark" type="submit">
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
-      <div className="mt-6 grid gap-3">
+
+        <div className="mt-8 grid gap-3">
         {leagues.map((row: any) => (
           <Link
             key={row.id}
             href={`/league/${row.code}`}
-            className="rounded-lg border bg-white p-4 hover:bg-gray-50"
+            className="card-solid p-4 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="font-medium">{row.name}</div>
-                <div className="text-xs text-gray-600">Code: {row.code}</div>
+                <div className="text-lg font-semibold">{row.name}</div>
+                <div className="mt-1 mono text-xs muted">Invite: {row.code}</div>
               </div>
-              <div className="text-xs text-gray-600">{row.role}</div>
+              <div className="mono text-xs muted">{row.role}</div>
             </div>
           </Link>
         ))}
 
         {leagues.length === 0 ? (
-          <div className="rounded-lg border bg-white p-4 text-sm text-gray-700">
-            No leagues yet. Create one or join with an invite code.
+          <div className="card-solid p-5 text-sm">
+            <div className="font-semibold">No leagues yet</div>
+            <div className="mt-1 muted">Create one, then share the invite code with your friends.</div>
           </div>
         ) : null}
+        </div>
       </div>
     </main>
   );

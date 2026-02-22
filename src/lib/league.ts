@@ -1,10 +1,12 @@
 import { db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function getLeagueByCode(codeRaw: string) {
-  const code = codeRaw.toUpperCase();
+export async function getLeagueByCode(codeRaw?: string) {
+  const code = typeof codeRaw === 'string' ? codeRaw.toUpperCase() : '';
   const user = await getCurrentUser();
   if (!user) return { league: null as any, member: null as any, user: null as any };
+
+  if (!code) return { league: null as any, member: null as any, user: null as any };
 
   const league = db().prepare('select id, code, name, owner_id from leagues where code = ?').get(code) as any;
   if (!league) return { league: null as any, member: null as any, user: null as any };

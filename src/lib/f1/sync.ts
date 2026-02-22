@@ -6,6 +6,7 @@ import {
   fetchQualifyingPoleDriverId,
   fetchRacePodiumDriverIds,
 } from '@/lib/f1/ergast';
+import { publishEvent } from '@/lib/events';
 
 function nowIso() {
   return new Date().toISOString();
@@ -50,6 +51,8 @@ export async function syncSeasonData(seasonYear: number) {
   });
   tx();
 
+  publishEvent('season_data_updated', { seasonYear, at: nowIso() });
+
   return { races: races.length, drivers: drivers.length, constructors: constructors.length };
 }
 
@@ -58,14 +61,13 @@ export async function syncCompletedRaceResults(seasonYear: number) {
     .prepare('select round, race_start from races where season_year = ? order by round asc')
     .all(seasonYear) as any[];
 
-  const existing = new Set(
-    (db().prepare('select round from race_results where season_year = ?').all(seasonYear) as any[]).map(
-      (r) => Number(r.round)
-    )
-  );
+  const existingByRound = new Map<number, any>();
+  for (const r of db().prepare('select round, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id from race_results where season_year = ?').all(seasonYear) as any[]) {
+    existingByRound.set(Number(r.round), r);
+  }
 
   const eligible = raceRows.filter((r) => r.race_start && new Date(String(r.race_start)).getTime() < Date.now());
-  const toSync = eligible.filter((r) => !existing.has(Number(r.round)));
+  const toSync = eligible;
 
   const upsert = db().prepare(
     `insert into race_results (season_year, round, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id, source, fetched_at, raw_json)
@@ -82,6 +84,7 @@ export async function syncCompletedRaceResults(seasonYear: number) {
 
   let synced = 0;
   let skipped = 0;
+  let changed = 0;
   for (const r of toSync) {
     const round = Number(r.round);
     try {
@@ -95,7 +98,7 @@ export async function syncCompletedRaceResults(seasonYear: number) {
         continue;
       }
 
-      upsert.run({
+      const row = {
         season_year: seasonYear,
         round,
         pole_driver_id: pole,
@@ -105,12 +108,26 @@ export async function syncCompletedRaceResults(seasonYear: number) {
         source: 'ergast-compatible',
         fetched_at: nowIso(),
         raw_json: JSON.stringify(podium.raw ?? {}),
-      });
+      };
+
+      const prev = existingByRound.get(round);
+      const isChanged =
+        !prev ||
+        String(prev.pole_driver_id ?? '') !== String(row.pole_driver_id ?? '') ||
+        String(prev.p1_driver_id ?? '') !== String(row.p1_driver_id ?? '') ||
+        String(prev.p2_driver_id ?? '') !== String(row.p2_driver_id ?? '') ||
+        String(prev.p3_driver_id ?? '') !== String(row.p3_driver_id ?? '');
+
+      if (isChanged) {
+        upsert.run(row);
+        publishEvent('race_results_updated', { seasonYear, round, at: nowIso() });
+        changed++;
+      }
       synced++;
     } catch {
       skipped++;
     }
   }
 
-  return { eligible: eligible.length, toSync: toSync.length, synced, skipped };
+  return { eligible: eligible.length, toSync: toSync.length, synced, skipped, changed };
 }

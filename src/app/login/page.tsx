@@ -5,12 +5,13 @@ import { getCurrentUser, signIn } from '@/lib/auth';
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams?: { next?: string; error?: string };
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   const user = await getCurrentUser();
   if (user) redirect('/leagues');
 
-  const next = searchParams?.next ?? '/leagues';
+  const sp = await searchParams;
+  const next = sp.next ?? '/leagues';
 
   async function action(formData: FormData) {
     'use server';
@@ -22,33 +23,36 @@ export default async function LoginPage({
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6 bg-zinc-50">
-      <div className="w-full max-w-md rounded-xl border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">F1 Predictions</h1>
-        <p className="mt-1 text-sm text-gray-600">Sign in to your local league server.</p>
+    <main className="app-bg flex items-center justify-center p-6">
+      <div className="w-full max-w-md card-solid p-6 wipe-in">
+        <div className="flex items-baseline justify-between gap-4">
+          <h1 className="text-3xl leading-none h-display">Track Day Picks</h1>
+          <div className="mono text-xs muted">3210</div>
+        </div>
+        <p className="mt-2 text-sm muted">Sign in to join your league and lock your picks before lights out.</p>
 
-        <form className="mt-6 space-y-3" action={action}>
+        <form className="mt-6 grid gap-3" action={action}>
           <label className="block">
-            <span className="text-sm font-medium">Nickname</span>
-            <input className="mt-1 w-full rounded-md border px-3 py-2" name="nickname" required />
+            <div className="text-sm font-semibold">Nickname</div>
+            <input className="mt-1 w-full field" name="nickname" autoComplete="username" required />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">Password</span>
-            <input className="mt-1 w-full rounded-md border px-3 py-2" name="password" type="password" required />
+            <div className="text-sm font-semibold">Password</div>
+            <input className="mt-1 w-full field" name="password" type="password" autoComplete="current-password" required />
           </label>
-          <button className="w-full rounded-md bg-black px-3 py-2 text-white" type="submit">
+          <button className="w-full btn btn-primary" type="submit">
             Sign in
           </button>
         </form>
 
-        <div className="mt-4 text-sm text-gray-700">
-          No account yet?{' '}
-          <Link className="underline" href="/register">
+        <div className="mt-4 text-sm">
+          <span className="muted">No account yet?</span>{' '}
+          <Link className="underline underline-offset-4" href="/register">
             Register
           </Link>
         </div>
 
-        {searchParams?.error ? <p className="mt-4 text-sm text-red-700">Invalid login.</p> : null}
+        {sp.error ? <p className="mt-4 text-sm text-red-700">Invalid login.</p> : null}
       </div>
     </main>
   );

@@ -22,29 +22,29 @@ export default async function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6 bg-zinc-50">
-      <div className="w-full max-w-md rounded-xl border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Create account</h1>
-        <p className="mt-1 text-sm text-gray-600">Nickname + password (local).</p>
+    <main className="app-bg flex items-center justify-center p-6">
+      <div className="w-full max-w-md card-solid p-6 wipe-in">
+        <h1 className="text-3xl leading-none h-display">Create Driver ID</h1>
+        <p className="mt-2 text-sm muted">Local nickname + password. No email, no fuss.</p>
 
-        <form className="mt-6 space-y-3" action={action}>
+        <form className="mt-6 grid gap-3" action={action}>
           <label className="block">
-            <span className="text-sm font-medium">Nickname</span>
-            <input className="mt-1 w-full rounded-md border px-3 py-2" name="nickname" required />
+            <div className="text-sm font-semibold">Nickname</div>
+            <input className="mt-1 w-full field" name="nickname" autoComplete="username" required />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">Password</span>
-            <input className="mt-1 w-full rounded-md border px-3 py-2" name="password" type="password" required />
-            <div className="mt-1 text-xs text-gray-600">Min 6 characters.</div>
+            <div className="text-sm font-semibold">Password</div>
+            <input className="mt-1 w-full field" name="password" type="password" autoComplete="new-password" required />
+            <div className="mt-1 text-xs muted">Min 6 characters.</div>
           </label>
-          <button className="w-full rounded-md bg-black px-3 py-2 text-white" type="submit">
+          <button className="w-full btn btn-primary" type="submit">
             Register
           </button>
         </form>
 
-        <div className="mt-4 text-sm text-gray-700">
-          Already have an account?{' '}
-          <Link className="underline" href="/login">
+        <div className="mt-4 text-sm">
+          <span className="muted">Already have an account?</span>{' '}
+          <Link className="underline underline-offset-4" href="/login">
             Sign in
           </Link>
         </div>

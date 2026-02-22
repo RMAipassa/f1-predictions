@@ -2,12 +2,14 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getLeagueByCode } from '@/lib/league';
 import { db } from '@/lib/db';
+import LiveUpdates from '@/components/LiveUpdates';
 
 const WEIGHTS: Record<number, number> = { 1: 8, 2: 6, 3: 4, 4: 2, 5: 1 };
 
-export default async function RandomReviewPage({ params }: { params: { code: string } }) {
-  const { league, member, user } = await getLeagueByCode(params.code);
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${params.code}/season/review`)}`);
+export default async function RandomReviewPage({ params }: { params: Promise<{ code: string }> }) {
+  const p = await params;
+  const { league, member, user } = await getLeagueByCode(p.code);
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/season/review`)}`);
   if (!league) return notFound();
   if (!member || member.role !== 'owner') return notFound();
 
@@ -39,7 +41,7 @@ export default async function RandomReviewPage({ params }: { params: { code: str
   async function save(formData: FormData) {
     'use server';
 
-    const { league: freshLeague, member: freshMember, user: freshUser } = await getLeagueByCode(params.code);
+    const { league: freshLeague, member: freshMember, user: freshUser } = await getLeagueByCode(p.code);
     if (!freshLeague || !freshUser) return;
     if (!freshMember || freshMember.role !== 'owner') return;
 
@@ -74,24 +76,31 @@ export default async function RandomReviewPage({ params }: { params: { code: str
       for (const r of rows) stmt.run(r);
     });
     if (rows.length) tx();
+
+    // Nudge clients to refresh leaderboards.
+    const { publishEvent } = await import('@/lib/events');
+    publishEvent('random_reviews_updated', { seasonYear, at: new Date().toISOString() });
   }
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Random prediction review</h1>
-          <div className="mt-1 text-sm text-gray-600">Season {seasonYear}</div>
+    <main className="app-bg">
+      <LiveUpdates />
+      <div className="shell">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="mono text-xs muted">Season {seasonYear}</div>
+            <h1 className="text-5xl leading-none h-display">Random Review</h1>
+            <div className="mt-2 text-sm muted">Mark each prediction correct/incorrect.</div>
+          </div>
+          <Link className="btn" href={`/league/${league.code}/season`}>
+            Back
+          </Link>
         </div>
-        <Link className="rounded-md border px-3 py-2 text-sm" href={`/league/${league.code}/season`}>
-          Back
-        </Link>
-      </div>
 
-      <form action={save} className="mt-6 grid gap-4">
+        <form action={save} className="mt-8 grid gap-4">
         {preds.map((p: any) => (
-          <div key={p.user_id} className="rounded-xl border bg-white p-4">
-            <div className="text-sm font-medium">User: {p.nickname}</div>
+          <div key={p.user_id} className="card-solid p-5">
+            <div className="text-sm font-semibold">{p.nickname}</div>
             <div className="mt-3 grid gap-3">
               {([1, 2, 3, 4, 5] as const).map((idx) => {
                 const random = JSON.parse(String(p.random_json || '{}')) as any;
@@ -99,9 +108,11 @@ export default async function RandomReviewPage({ params }: { params: { code: str
                 const current = reviewMap.get(`${p.user_id}:${idx}`);
                 return (
                   <div key={idx} className="grid gap-1">
-                    <div className="text-sm">{idx}. ({WEIGHTS[idx]}pt) {text || '—'}</div>
+                    <div className="text-sm">
+                      <span className="mono">{idx}.</span> <span className="mono muted">({WEIGHTS[idx]}pt)</span> {text || '—'}
+                    </div>
                     <select
-                      className="w-full max-w-xs rounded-md border px-3 py-2 text-sm"
+                      className="w-full max-w-xs field text-sm"
                       name={`r:${p.user_id}:${idx}`}
                       defaultValue={current === null || typeof current === 'undefined' ? '' : String(current)}
                     >
@@ -116,10 +127,11 @@ export default async function RandomReviewPage({ params }: { params: { code: str
           </div>
         ))}
 
-        <button className="rounded-md bg-black px-3 py-2 text-white" type="submit">
-          Save reviews
-        </button>
-      </form>
+          <button className="btn btn-primary" type="submit">
+            Save reviews
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
