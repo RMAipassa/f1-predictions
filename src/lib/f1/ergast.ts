@@ -23,11 +23,17 @@ export async function fetchSeasonCalendar(seasonYear: number) {
     const date = r.date as string | undefined;
     const time = r.time as string | undefined;
     const raceStart = date ? new Date(`${date}T${time ?? '00:00:00Z'}`) : null;
+
+    const qDate = r.Qualifying?.date as string | undefined;
+    const qTime = r.Qualifying?.time as string | undefined;
+    const qualiStart = qDate ? new Date(`${qDate}T${qTime ?? '00:00:00Z'}`) : null;
+
     return {
       season_year: seasonYear,
       round: Number(r.round),
       name: String(r.raceName ?? `Round ${r.round}`),
       circuit_name: String(r.Circuit?.circuitName ?? ''),
+      quali_start: qualiStart ? qualiStart.toISOString() : null,
       race_start: raceStart ? raceStart.toISOString() : null,
     };
   });

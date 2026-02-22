@@ -29,7 +29,7 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
   const seasonYear = new Date().getUTCFullYear();
 
   const race = db()
-    .prepare('select season_year, round, name, race_start from races where season_year = ? and round = ?')
+    .prepare('select season_year, round, name, quali_start, race_start from races where season_year = ? and round = ?')
     .get(seasonYear, round) as any;
   const drivers = db()
     .prepare('select driver_id, given_name, family_name, code from drivers order by family_name asc')
@@ -47,10 +47,16 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
 
   if (!race) return notFound();
 
-  const lockAt = race.race_start ? new Date(race.race_start) : null;
-  const locked = lockAt ? lockAt.getTime() <= Date.now() : false;
+  const now = Date.now();
+
+  const raceLockAt = race.race_start ? new Date(race.race_start) : null;
+  const qualiLockAt = race.quali_start ? new Date(race.quali_start) : raceLockAt;
+
+  const poleLocked = qualiLockAt ? qualiLockAt.getTime() <= now : false;
+  const raceLocked = raceLockAt ? raceLockAt.getTime() <= now : false;
+
   const scoring = result ? scoreRacePick(pred, result) : null;
-  const canViewOthers = locked || String(league.owner_id) === user.id;
+  const canViewOthers = raceLocked || String(league.owner_id) === user.id;
 
   const driverLabelById = new Map<string, string>();
   for (const d of drivers ?? []) {
@@ -90,18 +96,31 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
     const { league: freshLeague, user: freshUser } = await getLeagueByCode(p.code);
     if (!freshLeague || !freshUser) return;
 
-    const freshRace = db().prepare('select race_start from races where season_year = ? and round = ?').get(seasonYear, round) as any;
-    const freshLockAt = freshRace?.race_start ? new Date(String(freshRace.race_start)) : null;
-    if (freshLockAt && freshLockAt.getTime() <= Date.now()) {
-      redirect(selfHref);
-    }
+    const freshRace = db()
+      .prepare('select quali_start, race_start from races where season_year = ? and round = ?')
+      .get(seasonYear, round) as any;
+
+    const now = Date.now();
+    const raceLockAt = freshRace?.race_start ? new Date(String(freshRace.race_start)) : null;
+    const qualiLockAt = freshRace?.quali_start ? new Date(String(freshRace.quali_start)) : raceLockAt;
+    const poleLocked = qualiLockAt ? qualiLockAt.getTime() <= now : false;
+    const raceLocked = raceLockAt ? raceLockAt.getTime() <= now : false;
+    if (raceLocked) redirect(selfHref);
+
+    const existing = db()
+      .prepare(
+        'select pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id from race_predictions where league_id = ? and user_id = ? and season_year = ? and round = ?'
+      )
+      .get(String(freshLeague.id), freshUser.id, seasonYear, round) as any;
 
     const payload = {
       league_id: freshLeague.id,
       user_id: freshUser.id,
       season_year: seasonYear,
       round,
-      pole_driver_id: String(formData.get('pole_driver_id') ?? '') || null,
+      pole_driver_id: poleLocked
+        ? (existing?.pole_driver_id ? String(existing.pole_driver_id) : null)
+        : String(formData.get('pole_driver_id') ?? '') || null,
       p1_driver_id: String(formData.get('p1_driver_id') ?? '') || null,
       p2_driver_id: String(formData.get('p2_driver_id') ?? '') || null,
       p3_driver_id: String(formData.get('p3_driver_id') ?? '') || null,
@@ -131,7 +150,11 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
             <div className="mono text-xs muted">Round {race.round}</div>
             <h1 className="text-5xl leading-none h-display">{race.name}</h1>
             <div className="mt-2 text-sm muted">
-              Lock: <span className="mono">{lockAt ? lockAt.toLocaleString() : 'TBD'}</span> ({locked ? 'locked' : 'open'})
+              Quali lock:{' '}
+              <span className="mono">{qualiLockAt ? qualiLockAt.toLocaleString() : 'TBD'}</span> ({poleLocked ? 'locked' : 'open'})
+              <span className="mono">{'  '}</span>
+              Race lock:{' '}
+              <span className="mono">{raceLockAt ? raceLockAt.toLocaleString() : 'TBD'}</span> ({raceLocked ? 'locked' : 'open'})
             </div>
           </div>
           <Link className="btn" href={`/league/${league.code}/races`}>
@@ -141,7 +164,8 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
 
         <form action={save} className="mt-8 grid gap-3 card-solid p-5">
           <UniqueRaceSelects
-            disabled={locked}
+            disabled={raceLocked}
+            disabledFields={{ pole_driver_id: poleLocked }}
             drivers={drivers ?? []}
             fields={[
               { name: 'pole_driver_id', label: 'Pole' },
@@ -162,8 +186,8 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
               p3_driver_id: pred?.p3_driver_id ?? '',
             }}
           />
-        <button className={`btn ${locked ? '' : 'btn-primary'} disabled:opacity-50`} type="submit" disabled={locked}>
-          {locked ? 'Locked' : 'Save picks'}
+        <button className={`btn ${raceLocked ? '' : 'btn-primary'} disabled:opacity-50`} type="submit" disabled={raceLocked}>
+          {raceLocked ? 'Locked' : 'Save picks'}
         </button>
       </form>
 

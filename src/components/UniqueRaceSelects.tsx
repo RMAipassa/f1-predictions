@@ -16,12 +16,14 @@ export default function UniqueRaceSelects({
   drivers,
   initial,
   disabled,
+  disabledFields,
   uniqueGroup,
 }: {
   fields: Field[];
   drivers: Driver[];
   initial?: Record<string, string>;
   disabled: boolean;
+  disabledFields?: Record<string, boolean>;
   // Fields with the same group value must be unique with each other.
   // Fields with different groups may share the same driver.
   uniqueGroup?: Record<string, string>;
@@ -45,6 +47,7 @@ export default function UniqueRaceSelects({
     <div className="grid gap-3">
       {fields.map((f) => {
         const current = values[f.name] ?? '';
+        const isDisabled = disabled || Boolean(disabledFields?.[f.name]);
         const group = uniqueGroup?.[f.name] ?? 'all';
         const taken = new Set(
           Object.entries(values)
@@ -60,7 +63,7 @@ export default function UniqueRaceSelects({
               className="mt-1 w-full field"
               name={f.name}
               value={current}
-              disabled={disabled}
+              disabled={isDisabled}
               onChange={(e) => {
                 const next = e.target.value;
                 setValues((prev) => ({ ...prev, [f.name]: next }));

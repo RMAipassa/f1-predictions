@@ -57,6 +57,7 @@ function migrate(db: Database.Database) {
       round integer not null,
       name text not null,
       circuit_name text,
+      quali_start text,
       race_start text,
       primary key (season_year, round)
     );
@@ -129,6 +130,16 @@ function migrate(db: Database.Database) {
       v text not null
     );
   `);
+
+  // Lightweight column migrations for existing db.sqlite.
+  try {
+    const cols = new Set(
+      (db.prepare("select name from pragma_table_info('races')").all() as any[]).map((r) => String(r.name))
+    );
+    if (!cols.has('quali_start')) db.prepare('alter table races add column quali_start text').run();
+  } catch {
+    // ignore
+  }
 }
 
 export function db() {
