@@ -20,9 +20,9 @@ export default async function RandomReviewPage({ params }: { params: Promise<{ c
       `select sp.user_id, u.nickname, sp.random_json
        from season_predictions sp
        join users u on u.id = sp.user_id
-       where sp.league_id = ? and sp.season_year = ?
+       where sp.league_id = ? and sp.season_year = ? and sp.invalidated_at is null
        order by u.nickname asc`
-    )
+     )
     .all(String(league.id), seasonYear) as any[];
 
   const reviews = db()

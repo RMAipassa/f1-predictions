@@ -63,7 +63,7 @@ export default async function MemberPredictionsPage({
 
   const seasonPredRow = db()
     .prepare(
-      'select wdc_json, wcc_json, random_json, submitted_at from season_predictions where league_id = ? and user_id = ? and season_year = ?'
+      'select wdc_json, wcc_json, random_json, submitted_at, invalidated_at from season_predictions where league_id = ? and user_id = ? and season_year = ?'
     )
     .get(String(league.id), targetUserId, seasonYear) as any;
 
@@ -87,10 +87,11 @@ export default async function MemberPredictionsPage({
   const lockAt = race1?.race_start ? new Date(String(race1.race_start)) : null;
   const seasonLocked = lockAt ? lockAt.getTime() <= Date.now() : false;
   const canViewSeason = viewerIsOwner || viewerIsSelf || seasonLocked;
+  const seasonPredictionInvalidated = Boolean(seasonPredRow?.invalidated_at);
 
-  const wdc = canViewSeason && seasonPredRow?.wdc_json ? JSON.parse(String(seasonPredRow.wdc_json)) : null;
-  const wcc = canViewSeason && seasonPredRow?.wcc_json ? JSON.parse(String(seasonPredRow.wcc_json)) : null;
-  const random = canViewSeason && seasonPredRow?.random_json ? JSON.parse(String(seasonPredRow.random_json)) : null;
+  const wdc = canViewSeason && !seasonPredictionInvalidated && seasonPredRow?.wdc_json ? JSON.parse(String(seasonPredRow.wdc_json)) : null;
+  const wcc = canViewSeason && !seasonPredictionInvalidated && seasonPredRow?.wcc_json ? JSON.parse(String(seasonPredRow.wcc_json)) : null;
+  const random = canViewSeason && !seasonPredictionInvalidated && seasonPredRow?.random_json ? JSON.parse(String(seasonPredRow.random_json)) : null;
 
   return (
     <main className="app-bg">
@@ -122,6 +123,8 @@ export default async function MemberPredictionsPage({
 
           {!canViewSeason ? (
             <div className="mt-2 text-sm muted">Season picks become visible once the season locks.</div>
+          ) : seasonPredictionInvalidated ? (
+            <div className="mt-2 text-sm muted">This season prediction was invalidated by the league owner.</div>
           ) : (
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <div className="card p-4">

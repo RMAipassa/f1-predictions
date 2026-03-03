@@ -97,6 +97,8 @@ function migrate(db: Database.Database) {
       wcc_json text not null,
       random_json text not null,
       submitted_at text not null,
+      invalidated_at text,
+      invalidated_by text references users(id) on delete set null,
       primary key (league_id, user_id, season_year)
     );
 
@@ -137,6 +139,16 @@ function migrate(db: Database.Database) {
       (db.prepare("select name from pragma_table_info('races')").all() as any[]).map((r) => String(r.name))
     );
     if (!cols.has('quali_start')) db.prepare('alter table races add column quali_start text').run();
+  } catch {
+    // ignore
+  }
+
+  try {
+    const cols = new Set(
+      (db.prepare("select name from pragma_table_info('season_predictions')").all() as any[]).map((r) => String(r.name))
+    );
+    if (!cols.has('invalidated_at')) db.prepare('alter table season_predictions add column invalidated_at text').run();
+    if (!cols.has('invalidated_by')) db.prepare('alter table season_predictions add column invalidated_by text').run();
   } catch {
     // ignore
   }

@@ -25,11 +25,13 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
   const race1 = db().prepare('select race_start from races where season_year = ? and round = 1').get(seasonYear) as any;
   const predRow = db()
     .prepare(
-      'select wdc_json, wcc_json, random_json, submitted_at from season_predictions where league_id = ? and user_id = ? and season_year = ?'
+      'select wdc_json, wcc_json, random_json, submitted_at, invalidated_at from season_predictions where league_id = ? and user_id = ? and season_year = ?'
     )
     .get(String(league.id), user.id, seasonYear) as any;
 
-  const pred = predRow
+  const predInvalidatedAt = predRow?.invalidated_at ? String(predRow.invalidated_at) : null;
+
+  const pred = predRow && !predInvalidatedAt
     ? {
         wdc: JSON.parse(String(predRow.wdc_json || '{}')),
         wcc: JSON.parse(String(predRow.wcc_json || '{}')),
@@ -65,9 +67,10 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
            from league_members lm
            join users u on u.id = lm.user_id
            left join season_predictions sp
-             on sp.league_id = lm.league_id
-            and sp.user_id = lm.user_id
-            and sp.season_year = ?
+              on sp.league_id = lm.league_id
+             and sp.user_id = lm.user_id
+             and sp.season_year = ?
+             and sp.invalidated_at is null
            where lm.league_id = ?
            order by u.nickname asc`
         )
@@ -84,18 +87,31 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
     const freshLockAt = freshRace1?.race_start ? new Date(String(freshRace1.race_start)) : null;
     if (freshLockAt && freshLockAt.getTime() <= Date.now()) redirect(selfHref);
 
-    const wdc: Record<string, string> = {};
-    const wcc: Record<string, string> = {};
-    const random: Record<string, string> = {};
+    const validDriverIds = new Set(
+      ((db().prepare('select driver_id from drivers').all() as any[]) ?? []).map((d: any) => String(d.driver_id))
+    );
+    const validConstructorIds = new Set(
+      ((db().prepare('select constructor_id from constructors').all() as any[]) ?? []).map((c: any) => String(c.constructor_id))
+    );
 
-    for (let i = 1; i <= WDC_SLOTS; i++) {
-      const v = String(formData.get(`wdc_p${i}`) ?? '').trim();
-      if (v) wdc[`p${i}`] = v;
+    function parseRankedUnique(prefix: string, slots: number, allowed: Set<string>) {
+      const out: Record<string, string> = {};
+      const seen = new Set<string>();
+      for (let i = 1; i <= slots; i++) {
+        const v = String(formData.get(`${prefix}${i}`) ?? '').trim();
+        if (!v || !allowed.has(v)) continue;
+        if (seen.has(v)) return null;
+        seen.add(v);
+        out[`p${i}`] = v;
+      }
+      return out;
     }
-    for (let i = 1; i <= WCC_SLOTS; i++) {
-      const v = String(formData.get(`wcc_p${i}`) ?? '').trim();
-      if (v) wcc[`p${i}`] = v;
-    }
+
+    const wdc = parseRankedUnique('wdc_p', WDC_SLOTS, validDriverIds);
+    const wcc = parseRankedUnique('wcc_p', WCC_SLOTS, validConstructorIds);
+    if (!wdc || !wcc) redirect(selfHref);
+
+    const random: Record<string, string> = {};
     for (let i = 1; i <= 5; i++) {
       const v = String(formData.get(`random_${i}`) ?? '').trim();
       if (v) random[`r${i}`] = v;
@@ -105,11 +121,13 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
     db().prepare(
       `insert into season_predictions (league_id, user_id, season_year, wdc_json, wcc_json, random_json, submitted_at)
        values (@league_id, @user_id, @season_year, @wdc_json, @wcc_json, @random_json, @submitted_at)
-       on conflict (league_id, user_id, season_year) do update set
-         wdc_json=excluded.wdc_json,
-         wcc_json=excluded.wcc_json,
-         random_json=excluded.random_json,
-         submitted_at=excluded.submitted_at`
+        on conflict (league_id, user_id, season_year) do update set
+          wdc_json=excluded.wdc_json,
+          wcc_json=excluded.wcc_json,
+          random_json=excluded.random_json,
+          invalidated_at=null,
+          invalidated_by=null,
+          submitted_at=excluded.submitted_at`
     ).run({
       league_id: String(freshLeague.id),
       user_id: freshUser.id,
@@ -141,6 +159,13 @@ export default async function LeagueSeasonPredictionsPage({ params }: { params: 
         </div>
 
         <form action={save} className="mt-8 grid gap-6">
+          {predInvalidatedAt ? (
+            <div className="card-solid p-4 text-sm">
+              <div className="font-semibold">Your previous season prediction was invalidated by the league owner.</div>
+              <div className="mt-1 muted">Please resubmit valid WDC/WCC picks with unique entries.</div>
+            </div>
+          ) : null}
+
           <section className="card-solid p-5">
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-2xl h-display">WDC</h2>

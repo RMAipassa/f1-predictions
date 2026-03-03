@@ -16,6 +16,12 @@ function setTheme(theme: Theme) {
   } catch {
     // ignore
   }
+
+  try {
+    document.cookie = `theme=${theme}; path=/; max-age=31536000; samesite=lax`;
+  } catch {
+    // ignore
+  }
 }
 
 export default function ThemeToggle() {

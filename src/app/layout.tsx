@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Bebas_Neue, IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
+import { cookies } from 'next/headers';
 import './globals.css';
 import FloatingActions from '@/components/FloatingActions';
 import PwaRegister from '@/components/PwaRegister';
@@ -49,13 +50,17 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const c = await cookies();
+  const cookieTheme = c.get('theme')?.value;
+  const initialTheme = cookieTheme === 'dark' || cookieTheme === 'light' ? cookieTheme : 'light';
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-theme={initialTheme}>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -63,9 +68,14 @@ export default function RootLayout({
   try {
     let t = localStorage.getItem('theme');
     if (t !== 'light' && t !== 'dark') {
+      const m = document.cookie.match(/(?:^|;\\s*)theme=(light|dark)(?:;|$)/);
+      t = m ? m[1] : null;
+    }
+    if (t !== 'light' && t !== 'dark') {
       t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     document.documentElement.dataset.theme = t;
+    document.cookie = 'theme=' + t + '; path=/; max-age=31536000; samesite=lax';
   } catch (e) {
     // ignore
   }
