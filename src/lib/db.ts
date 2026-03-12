@@ -58,6 +58,8 @@ function migrate(db: Database.Database) {
       name text not null,
       circuit_name text,
       quali_start text,
+      sprint_quali_start text,
+      sprint_race_start text,
       race_start text,
       primary key (season_year, round)
     );
@@ -122,8 +124,24 @@ function migrate(db: Database.Database) {
       p1_driver_id text,
       p2_driver_id text,
       p3_driver_id text,
+      sprint_pole_driver_id text,
+      sprint_p1_driver_id text,
+      sprint_p2_driver_id text,
+      sprint_p3_driver_id text,
       submitted_at text not null,
       primary key (league_id, user_id, season_year, round),
+      foreign key (season_year, round) references races(season_year, round) on delete cascade
+    );
+
+    create table if not exists prediction_unlock_overrides (
+      league_id text not null references leagues(id) on delete cascade,
+      season_year integer not null references seasons(year) on delete cascade,
+      round integer not null,
+      prediction_key text not null check (prediction_key in ('race_pole','race_podium','sprint_pole','sprint_podium')),
+      is_enabled integer not null check (is_enabled in (0,1)),
+      updated_by text references users(id) on delete set null,
+      updated_at text not null,
+      primary key (league_id, season_year, round, prediction_key),
       foreign key (season_year, round) references races(season_year, round) on delete cascade
     );
 
@@ -139,6 +157,8 @@ function migrate(db: Database.Database) {
       (db.prepare("select name from pragma_table_info('races')").all() as any[]).map((r) => String(r.name))
     );
     if (!cols.has('quali_start')) db.prepare('alter table races add column quali_start text').run();
+    if (!cols.has('sprint_quali_start')) db.prepare('alter table races add column sprint_quali_start text').run();
+    if (!cols.has('sprint_race_start')) db.prepare('alter table races add column sprint_race_start text').run();
   } catch {
     // ignore
   }
@@ -149,6 +169,18 @@ function migrate(db: Database.Database) {
     );
     if (!cols.has('invalidated_at')) db.prepare('alter table season_predictions add column invalidated_at text').run();
     if (!cols.has('invalidated_by')) db.prepare('alter table season_predictions add column invalidated_by text').run();
+  } catch {
+    // ignore
+  }
+
+  try {
+    const cols = new Set(
+      (db.prepare("select name from pragma_table_info('race_predictions')").all() as any[]).map((r) => String(r.name))
+    );
+    if (!cols.has('sprint_pole_driver_id')) db.prepare('alter table race_predictions add column sprint_pole_driver_id text').run();
+    if (!cols.has('sprint_p1_driver_id')) db.prepare('alter table race_predictions add column sprint_p1_driver_id text').run();
+    if (!cols.has('sprint_p2_driver_id')) db.prepare('alter table race_predictions add column sprint_p2_driver_id text').run();
+    if (!cols.has('sprint_p3_driver_id')) db.prepare('alter table race_predictions add column sprint_p3_driver_id text').run();
   } catch {
     // ignore
   }

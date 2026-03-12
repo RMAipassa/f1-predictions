@@ -28,12 +28,23 @@ export async function fetchSeasonCalendar(seasonYear: number) {
     const qTime = r.Qualifying?.time as string | undefined;
     const qualiStart = qDate ? new Date(`${qDate}T${qTime ?? '00:00:00Z'}`) : null;
 
+    const sprintRaceDate = r.Sprint?.date as string | undefined;
+    const sprintRaceTime = r.Sprint?.time as string | undefined;
+    const sprintRaceStart = sprintRaceDate ? new Date(`${sprintRaceDate}T${sprintRaceTime ?? '00:00:00Z'}`) : null;
+
+    const sprintQualiObj = r.SprintQualifying || r.SprintShootout || r.SprintShootoutQualifying;
+    const sprintQualiDate = sprintQualiObj?.date as string | undefined;
+    const sprintQualiTime = sprintQualiObj?.time as string | undefined;
+    const sprintQualiStart = sprintQualiDate ? new Date(`${sprintQualiDate}T${sprintQualiTime ?? '00:00:00Z'}`) : null;
+
     return {
       season_year: seasonYear,
       round: Number(r.round),
       name: String(r.raceName ?? `Round ${r.round}`),
       circuit_name: String(r.Circuit?.circuitName ?? ''),
       quali_start: qualiStart ? qualiStart.toISOString() : null,
+      sprint_quali_start: sprintQualiStart ? sprintQualiStart.toISOString() : null,
+      sprint_race_start: sprintRaceStart ? sprintRaceStart.toISOString() : null,
       race_start: raceStart ? raceStart.toISOString() : null,
     };
   });

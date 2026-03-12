@@ -14,7 +14,7 @@ export default async function LeagueRacesPage({ params }: { params: Promise<{ co
 
   const seasonYear = new Date().getUTCFullYear();
   const races = db()
-    .prepare('select season_year, round, name, race_start from races where season_year = ? order by round asc')
+    .prepare('select season_year, round, name, sprint_race_start, race_start from races where season_year = ? order by round asc')
     .all(seasonYear) as any[];
   const results = db().prepare('select season_year, round from race_results where season_year = ?').all(seasonYear) as any[];
   const resultSet = new Set(results.map((r) => `${r.season_year}:${r.round}`));
@@ -58,7 +58,8 @@ export default async function LeagueRacesPage({ params }: { params: Promise<{ co
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="font-semibold">
-                    Round {race.round}: {race.name}
+                    Round {race.round}: {race.name}{' '}
+                    {race.sprint_race_start ? <span className="mono text-xs muted">(SPRINT)</span> : null}
                   </div>
                   <div className="mt-1 mono text-xs muted">
                     {race.race_start ? new Date(race.race_start).toLocaleString() : 'TBD'}

@@ -69,7 +69,9 @@ export default async function MemberPredictionsPage({
 
   const preds = db()
     .prepare(
-      `select round, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id, submitted_at
+      `select round, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id,
+              sprint_pole_driver_id, sprint_p1_driver_id, sprint_p2_driver_id, sprint_p3_driver_id,
+              submitted_at
        from race_predictions
        where league_id = ? and user_id = ? and season_year = ?`
     )
@@ -176,7 +178,7 @@ export default async function MemberPredictionsPage({
         <section className="mt-6 card-solid p-5">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-2xl h-display">Race Predictions</h2>
-            <div className="mono text-xs muted">POLE + PODIUM</div>
+            <div className="mono text-xs muted">RACE + SPRINT</div>
           </div>
 
           <div className="mt-4 overflow-x-auto">
@@ -189,6 +191,10 @@ export default async function MemberPredictionsPage({
                   <th className="px-3 py-2">P1</th>
                   <th className="px-3 py-2">P2</th>
                   <th className="px-3 py-2">P3</th>
+                  <th className="px-3 py-2">Sprint Pole</th>
+                  <th className="px-3 py-2">Sprint P1</th>
+                  <th className="px-3 py-2">Sprint P2</th>
+                  <th className="px-3 py-2">Sprint P3</th>
                   <th className="px-3 py-2">Pts</th>
                 </tr>
               </thead>
@@ -219,6 +225,10 @@ export default async function MemberPredictionsPage({
                       <td className="px-3 py-2">{canView ? label(pred?.p1_driver_id) : '—'}</td>
                       <td className="px-3 py-2">{canView ? label(pred?.p2_driver_id) : '—'}</td>
                       <td className="px-3 py-2">{canView ? label(pred?.p3_driver_id) : '—'}</td>
+                      <td className="px-3 py-2">{canView ? label(pred?.sprint_pole_driver_id) : '—'}</td>
+                      <td className="px-3 py-2">{canView ? label(pred?.sprint_p1_driver_id) : '—'}</td>
+                      <td className="px-3 py-2">{canView ? label(pred?.sprint_p2_driver_id) : '—'}</td>
+                      <td className="px-3 py-2">{canView ? label(pred?.sprint_p3_driver_id) : '—'}</td>
                       <td className="px-3 py-2 mono">{scoring ? scoring.points : canView ? 0 : '—'}</td>
                     </tr>
                   );

@@ -41,6 +41,74 @@ function collectSeasonIssues(prefix: 'WDC' | 'WCC', slots: number, picks: Record
   return issues;
 }
 
+function collectRaceIssues(
+  picks: {
+    pole_driver_id: string | null;
+    p1_driver_id: string | null;
+    p2_driver_id: string | null;
+    p3_driver_id: string | null;
+    sprint_pole_driver_id: string | null;
+    sprint_p1_driver_id: string | null;
+    sprint_p2_driver_id: string | null;
+    sprint_p3_driver_id: string | null;
+  },
+  allowed: Set<string>
+) {
+  const issues: string[] = [];
+
+  const fields: Array<{ label: string; value: string | null }> = [
+    { label: 'Pole', value: picks.pole_driver_id },
+    { label: 'P1', value: picks.p1_driver_id },
+    { label: 'P2', value: picks.p2_driver_id },
+    { label: 'P3', value: picks.p3_driver_id },
+    { label: 'Sprint Pole', value: picks.sprint_pole_driver_id },
+    { label: 'Sprint P1', value: picks.sprint_p1_driver_id },
+    { label: 'Sprint P2', value: picks.sprint_p2_driver_id },
+    { label: 'Sprint P3', value: picks.sprint_p3_driver_id },
+  ];
+
+  for (const f of fields) {
+    if (!f.value) continue;
+    if (!allowed.has(f.value)) issues.push(`${f.label}: unknown id (${f.value})`);
+  }
+
+  const raceSlots = [
+    { label: 'P1', value: picks.p1_driver_id },
+    { label: 'P2', value: picks.p2_driver_id },
+    { label: 'P3', value: picks.p3_driver_id },
+  ].filter((x) => x.value);
+
+  const seen = new Map<string, string>();
+  for (const slot of raceSlots) {
+    const v = String(slot.value);
+    const prev = seen.get(v);
+    if (prev) {
+      issues.push(`Race duplicate: ${prev} and ${slot.label}`);
+    } else {
+      seen.set(v, slot.label);
+    }
+  }
+
+  const sprintRaceSlots = [
+    { label: 'Sprint P1', value: picks.sprint_p1_driver_id },
+    { label: 'Sprint P2', value: picks.sprint_p2_driver_id },
+    { label: 'Sprint P3', value: picks.sprint_p3_driver_id },
+  ].filter((x) => x.value);
+
+  const sprintSeen = new Map<string, string>();
+  for (const slot of sprintRaceSlots) {
+    const v = String(slot.value);
+    const prev = sprintSeen.get(v);
+    if (prev) {
+      issues.push(`Sprint duplicate: ${prev} and ${slot.label}`);
+    } else {
+      sprintSeen.set(v, slot.label);
+    }
+  }
+
+  return issues;
+}
+
 export default async function LeagueAdminPage({
   params,
   searchParams,
@@ -72,6 +140,11 @@ export default async function LeagueAdminPage({
     redirect(`/league/${p.code}/admin?verify=season`);
   }
 
+  async function verifyRacePredictions() {
+    'use server';
+    redirect(`/league/${p.code}/admin?verify=race`);
+  }
+
   const pending = db()
     .prepare(
       `select r.user_id, u.nickname, r.created_at
@@ -81,6 +154,24 @@ export default async function LeagueAdminPage({
        order by r.created_at asc`
     )
     .all(String(league.id)) as any[];
+
+  const rounds = db()
+    .prepare(
+      `select round, name, quali_start, sprint_quali_start, sprint_race_start, race_start
+       from races
+       where season_year = ?
+       order by round asc`
+    )
+    .all(seasonYear) as any[];
+
+  const unlockRows = db()
+    .prepare(
+      `select round, prediction_key, is_enabled
+       from prediction_unlock_overrides
+       where league_id = ? and season_year = ? and is_enabled = 1`
+    )
+    .all(String(league.id), seasonYear) as any[];
+  const unlockSet = new Set(unlockRows.map((r) => `${r.round}:${r.prediction_key}`));
 
   async function decide(formData: FormData) {
     'use server';
@@ -136,7 +227,59 @@ export default async function LeagueAdminPage({
     redirect(`/league/${p.code}/admin?verify=season`);
   }
 
+  async function invalidateRacePrediction(formData: FormData) {
+    'use server';
+
+    const targetUserId = String(formData.get('target_user_id') ?? '');
+    const targetRound = Number(formData.get('target_round') ?? 0);
+    if (!targetUserId || !Number.isFinite(targetRound) || targetRound <= 0) return;
+
+    const { user: u, league: l, member: m } = await getLeagueByCode(p.code);
+    if (!u || !l || !m || m.role !== 'owner') return;
+
+    db()
+      .prepare('delete from race_predictions where league_id = ? and user_id = ? and season_year = ? and round = ?')
+      .run(String(l.id), targetUserId, seasonYear, targetRound);
+
+    redirect(`/league/${p.code}/admin?verify=race`);
+  }
+
+  async function setPredictionOverride(formData: FormData) {
+    'use server';
+
+    const targetRound = Number(formData.get('target_round') ?? 0);
+    const predictionKey = String(formData.get('prediction_key') ?? '');
+    const enabled = String(formData.get('enabled') ?? '0') === '1';
+    if (!Number.isFinite(targetRound) || targetRound <= 0) return;
+
+    const allowedKeys = new Set(['race_pole', 'race_podium', 'sprint_pole', 'sprint_podium']);
+    if (!allowedKeys.has(predictionKey)) return;
+
+    const { user: u, league: l, member: m } = await getLeagueByCode(p.code);
+    if (!u || !l || !m || m.role !== 'owner') return;
+
+    if (enabled) {
+      db()
+        .prepare(
+          `insert into prediction_unlock_overrides (league_id, season_year, round, prediction_key, is_enabled, updated_by, updated_at)
+           values (?, ?, ?, ?, 1, ?, ?)
+           on conflict (league_id, season_year, round, prediction_key) do update set
+             is_enabled=excluded.is_enabled,
+             updated_by=excluded.updated_by,
+             updated_at=excluded.updated_at`
+        )
+        .run(String(l.id), seasonYear, targetRound, predictionKey, u.id, new Date().toISOString());
+    } else {
+      db()
+        .prepare('delete from prediction_unlock_overrides where league_id = ? and season_year = ? and round = ? and prediction_key = ?')
+        .run(String(l.id), seasonYear, targetRound, predictionKey);
+    }
+
+    redirect(`/league/${p.code}/admin`);
+  }
+
   const shouldVerifySeason = sp.verify === 'season';
+  const shouldVerifyRace = sp.verify === 'race';
 
   const invalidSeasonPredictions = shouldVerifySeason
     ? (() => {
@@ -171,6 +314,55 @@ export default async function LeagueAdminPage({
               nickname: String(r.nickname),
               submittedAt: String(r.submitted_at),
               invalidatedAt: r.invalidated_at ? String(r.invalidated_at) : null,
+              issues,
+            };
+          })
+          .filter((r) => r.issues.length > 0);
+      })()
+    : [];
+
+  const invalidRacePredictions = shouldVerifyRace
+    ? (() => {
+        const driverIds = new Set(
+          (db().prepare('select driver_id from drivers').all() as any[]).map((r) => String(r.driver_id))
+        );
+
+        const rows = db()
+          .prepare(
+            `select rp.user_id, u.nickname, rp.round, races.name as race_name,
+                    rp.pole_driver_id, rp.p1_driver_id, rp.p2_driver_id, rp.p3_driver_id,
+                    rp.sprint_pole_driver_id, rp.sprint_p1_driver_id, rp.sprint_p2_driver_id, rp.sprint_p3_driver_id,
+                    rp.submitted_at
+             from race_predictions rp
+             join users u on u.id = rp.user_id
+             join races on races.season_year = rp.season_year and races.round = rp.round
+             where rp.league_id = ? and rp.season_year = ?
+             order by rp.round asc, u.nickname asc`
+          )
+          .all(String(league.id), seasonYear) as any[];
+
+        return rows
+          .map((r) => {
+            const issues = collectRaceIssues(
+              {
+                pole_driver_id: r.pole_driver_id ? String(r.pole_driver_id) : null,
+                p1_driver_id: r.p1_driver_id ? String(r.p1_driver_id) : null,
+                p2_driver_id: r.p2_driver_id ? String(r.p2_driver_id) : null,
+                p3_driver_id: r.p3_driver_id ? String(r.p3_driver_id) : null,
+                sprint_pole_driver_id: r.sprint_pole_driver_id ? String(r.sprint_pole_driver_id) : null,
+                sprint_p1_driver_id: r.sprint_p1_driver_id ? String(r.sprint_p1_driver_id) : null,
+                sprint_p2_driver_id: r.sprint_p2_driver_id ? String(r.sprint_p2_driver_id) : null,
+                sprint_p3_driver_id: r.sprint_p3_driver_id ? String(r.sprint_p3_driver_id) : null,
+              },
+              driverIds
+            );
+
+            return {
+              userId: String(r.user_id),
+              nickname: String(r.nickname),
+              round: Number(r.round),
+              raceName: String(r.race_name),
+              submittedAt: String(r.submitted_at),
               issues,
             };
           })
@@ -214,6 +406,64 @@ export default async function LeagueAdminPage({
               <div className="mt-1 text-sm muted">Checks WDC/WCC for duplicates and unknown IDs.</div>
             </button>
           </form>
+          <form action={verifyRacePredictions}>
+            <button className="w-full card-solid p-5 text-left transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" type="submit">
+              <div className="mono text-xs muted">Validation</div>
+              <div className="mt-1 text-lg font-semibold">Verify race predictions</div>
+              <div className="mt-1 text-sm muted">Checks race + sprint picks for duplicates and unknown IDs.</div>
+            </button>
+          </form>
+        </div>
+
+        <div className="mt-10">
+          <div className="mono text-xs muted">LOCK OVERRIDES</div>
+          <div className="mt-3 card-solid p-5">
+            <div className="text-sm muted">Enable specific predictions after lock so users can still submit agreed picks.</div>
+            <div className="mt-4 grid gap-3">
+              {rounds.map((r) => (
+                <div key={r.round} className="card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">Round {r.round}: {String(r.name)}</div>
+                      <div className="mt-1 mono text-xs muted">
+                        Quali: {r.quali_start ? new Date(String(r.quali_start)).toLocaleString() : 'TBD'} | Sprint quali:{' '}
+                        {r.sprint_quali_start ? new Date(String(r.sprint_quali_start)).toLocaleString() : 'TBD'} | Sprint race:{' '}
+                        {r.sprint_race_start ? new Date(String(r.sprint_race_start)).toLocaleString() : 'TBD'} | Race:{' '}
+                        {r.race_start ? new Date(String(r.race_start)).toLocaleString() : 'TBD'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {[
+                      { key: 'race_pole', label: 'Race Pole' },
+                      { key: 'race_podium', label: 'Race Podium' },
+                      { key: 'sprint_pole', label: 'Sprint Pole' },
+                      { key: 'sprint_podium', label: 'Sprint Podium' },
+                    ].map((k) => {
+                      const enabled = unlockSet.has(`${r.round}:${k.key}`);
+                      return (
+                        <form key={k.key} action={setPredictionOverride} className="flex items-center justify-between gap-3 field">
+                          <input type="hidden" name="target_round" value={r.round} />
+                          <input type="hidden" name="prediction_key" value={k.key} />
+                          <input type="hidden" name="enabled" value={enabled ? '0' : '1'} />
+                          <div className="text-sm">
+                            <span className="font-medium">{k.label}</span>{' '}
+                            <span className="mono text-xs muted">{enabled ? 'ENABLED' : 'LOCKED'}</span>
+                          </div>
+                          <button className="btn" type="submit">{enabled ? 'Disable' : 'Enable'}</button>
+                        </form>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              {rounds.length === 0 ? (
+                <div className="text-sm muted">No rounds available yet. Sync season data first.</div>
+              ) : null}
+            </div>
+          </div>
         </div>
 
         {shouldVerifySeason ? (
@@ -249,6 +499,50 @@ export default async function LeagueAdminPage({
                       ) : (
                         <div className="mono text-xs muted">ALREADY INVALID</div>
                       )}
+                    </div>
+
+                    <div className="mt-3 grid gap-1 text-sm">
+                      {r.issues.map((issue) => (
+                        <div key={issue} className="mono">- {issue}</div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {shouldVerifyRace ? (
+          <div className="mt-10">
+            <div className="mono text-xs muted">RACE VALIDATION</div>
+            <div className="mt-3 grid gap-3">
+              {invalidRacePredictions.length === 0 ? (
+                <div className="card-solid p-5 text-sm">
+                  <div className="font-semibold">No invalid race predictions found</div>
+                  <div className="mt-1 muted">All quali/race picks are valid.</div>
+                </div>
+              ) : (
+                invalidRacePredictions.map((r) => (
+                  <div key={`${r.round}:${r.userId}`} className="card-solid p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-lg font-semibold">{r.nickname}</div>
+                        <div className="mt-1 mono text-xs muted">
+                          Round {r.round}: {r.raceName}
+                        </div>
+                        <div className="mt-1 mono text-xs muted">Submitted: {new Date(r.submittedAt).toLocaleString()}</div>
+                      </div>
+                      <form action={invalidateRacePrediction}>
+                        <input type="hidden" name="target_user_id" value={r.userId} />
+                        <input type="hidden" name="target_round" value={r.round} />
+                        <ConfirmSubmitButton
+                          className="btn"
+                          message={`Invalidate ${r.nickname}'s round ${r.round} prediction? This will delete that race prediction.`}
+                        >
+                          Invalidate prediction
+                        </ConfirmSubmitButton>
+                      </form>
                     </div>
 
                     <div className="mt-3 grid gap-1 text-sm">

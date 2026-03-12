@@ -22,12 +22,14 @@ export async function syncSeasonData(seasonYear: number) {
   ]);
 
   const upsertRace = db().prepare(
-    `insert into races (season_year, round, name, circuit_name, quali_start, race_start)
-     values (@season_year, @round, @name, @circuit_name, @quali_start, @race_start)
+    `insert into races (season_year, round, name, circuit_name, quali_start, sprint_quali_start, sprint_race_start, race_start)
+     values (@season_year, @round, @name, @circuit_name, @quali_start, @sprint_quali_start, @sprint_race_start, @race_start)
      on conflict (season_year, round) do update set
        name=excluded.name,
        circuit_name=excluded.circuit_name,
        quali_start=excluded.quali_start,
+       sprint_quali_start=excluded.sprint_quali_start,
+       sprint_race_start=excluded.sprint_race_start,
        race_start=excluded.race_start`
   );
   const upsertDriver = db().prepare(
