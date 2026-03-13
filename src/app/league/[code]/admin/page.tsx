@@ -110,6 +110,20 @@ function collectRaceIssues(
   return issues;
 }
 
+function scoreRacePoints(pred: any, result: any) {
+  if (!pred || !result) return 0;
+  let pts = 0;
+  if (pred.pole_driver_id && result.pole_driver_id && pred.pole_driver_id === result.pole_driver_id) pts++;
+  if (pred.p1_driver_id && result.p1_driver_id && pred.p1_driver_id === result.p1_driver_id) pts++;
+  if (pred.p2_driver_id && result.p2_driver_id && pred.p2_driver_id === result.p2_driver_id) pts++;
+  if (pred.p3_driver_id && result.p3_driver_id && pred.p3_driver_id === result.p3_driver_id) pts++;
+  if (pred.sprint_pole_driver_id && result.sprint_pole_driver_id && pred.sprint_pole_driver_id === result.sprint_pole_driver_id) pts++;
+  if (pred.sprint_p1_driver_id && result.sprint_p1_driver_id && pred.sprint_p1_driver_id === result.sprint_p1_driver_id) pts++;
+  if (pred.sprint_p2_driver_id && result.sprint_p2_driver_id && pred.sprint_p2_driver_id === result.sprint_p2_driver_id) pts++;
+  if (pred.sprint_p3_driver_id && result.sprint_p3_driver_id && pred.sprint_p3_driver_id === result.sprint_p3_driver_id) pts++;
+  return pts;
+}
+
 export default async function LeagueAdminPage({
   params,
   searchParams,
@@ -146,9 +160,88 @@ export default async function LeagueAdminPage({
 
   async function syncResults() {
     'use server';
+
+    const { league: freshLeague, member: freshMember, user: freshUser } = await getLeagueByCode(p.code);
+    if (!freshLeague || !freshUser || !freshMember || freshMember.role !== 'owner') return;
+
+    const beforeResults = db()
+      .prepare(
+        `select round,
+                pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id,
+                sprint_pole_driver_id, sprint_p1_driver_id, sprint_p2_driver_id, sprint_p3_driver_id
+         from race_results
+         where season_year = ?`
+      )
+      .all(seasonYear) as any[];
+    const preds = db()
+      .prepare(
+        `select user_id, round,
+                pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id,
+                sprint_pole_driver_id, sprint_p1_driver_id, sprint_p2_driver_id, sprint_p3_driver_id
+         from race_predictions
+         where league_id = ? and season_year = ?`
+      )
+      .all(String(freshLeague.id), seasonYear) as any[];
+
+    const beforeByRound = new Map<number, any>();
+    for (const r of beforeResults ?? []) beforeByRound.set(Number(r.round), r);
+
     const out = await syncCompletedRaceResults(seasonYear);
+
+    const afterResults = db()
+      .prepare(
+        `select round,
+                pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id,
+                sprint_pole_driver_id, sprint_p1_driver_id, sprint_p2_driver_id, sprint_p3_driver_id
+         from race_results
+         where season_year = ?`
+      )
+      .all(seasonYear) as any[];
+    const afterByRound = new Map<number, any>();
+    for (const r of afterResults ?? []) afterByRound.set(Number(r.round), r);
+
+    const members = db()
+      .prepare(
+        `select lm.user_id, u.nickname
+         from league_members lm
+         join users u on u.id = lm.user_id
+         where lm.league_id = ?`
+      )
+      .all(String(freshLeague.id)) as any[];
+    const nicknameByUser = new Map<string, string>();
+    for (const m of members ?? []) nicknameByUser.set(String(m.user_id), String(m.nickname));
+
+    const userDelta = new Map<string, number>();
+    const roundDelta = new Map<number, number>();
+
+    for (const pred of preds ?? []) {
+      const round = Number(pred.round);
+      const beforePts = scoreRacePoints(pred, beforeByRound.get(round));
+      const afterPts = scoreRacePoints(pred, afterByRound.get(round));
+      const delta = afterPts - beforePts;
+      if (!delta) continue;
+
+      const uid = String(pred.user_id);
+      userDelta.set(uid, (userDelta.get(uid) ?? 0) + delta);
+      roundDelta.set(round, (roundDelta.get(round) ?? 0) + delta);
+    }
+
+    const deltaPayload = {
+      at: new Date().toISOString(),
+      users: Array.from(userDelta.entries())
+        .map(([user_id, delta]) => ({ user_id, nickname: nicknameByUser.get(user_id) ?? user_id, delta }))
+        .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)),
+      rounds: Array.from(roundDelta.entries())
+        .map(([round, delta]) => ({ round, delta }))
+        .sort((a, b) => a.round - b.round),
+    };
+
+    db()
+      .prepare('insert into kv (k, v) values (?, ?) on conflict (k) do update set v = excluded.v')
+      .run(`sync_delta:${freshLeague.id}:${seasonYear}`, JSON.stringify(deltaPayload));
+
     redirect(
-      `/league/${p.code}/admin?sync=results&eligible=${out.eligible}&synced=${out.synced}&skipped=${out.skipped}&changed=${out.changed}`
+      `/league/${p.code}/admin/results?eligible=${out.eligible}&synced=${out.synced}&skipped=${out.skipped}&changed=${out.changed}`
     );
   }
 
@@ -300,8 +393,6 @@ export default async function LeagueAdminPage({
   const syncMessage =
     sp.sync === 'season'
       ? `Season data synced. Races: ${Number(sp.races ?? 0)}, Drivers: ${Number(sp.drivers ?? 0)}, Constructors: ${Number(sp.constructors ?? 0)}.`
-      : sp.sync === 'results'
-      ? `Results sync finished. Eligible rounds: ${Number(sp.eligible ?? 0)}, Synced: ${Number(sp.synced ?? 0)}, Changed: ${Number(sp.changed ?? 0)}, Skipped: ${Number(sp.skipped ?? 0)}.`
       : null;
 
   const invalidSeasonPredictions = shouldVerifySeason
