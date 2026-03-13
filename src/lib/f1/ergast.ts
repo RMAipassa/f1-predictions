@@ -88,3 +88,41 @@ export async function fetchRacePodiumDriverIds(seasonYear: number, round: number
   const p3 = results?.[2]?.Driver?.driverId ? String(results[2].Driver.driverId) : null;
   return { p1, p2, p3, raw: json };
 }
+
+export async function fetchSprintPoleDriverId(seasonYear: number, round: number) {
+  const paths = [`/f1/${seasonYear}/${round}/sprintqualifying.json`, `/f1/${seasonYear}/${round}/sprintshootout.json`];
+
+  for (const path of paths) {
+    try {
+      const json = await getJson(path);
+      const race = (json.MRData?.RaceTable?.Races ?? [])[0];
+      const q1 = race?.SprintQualifyingResults?.[0] ?? race?.SprintShootoutResults?.[0];
+      const driverId = q1?.Driver?.driverId;
+      if (driverId) return String(driverId);
+    } catch {
+      // try next endpoint
+    }
+  }
+
+  return null;
+}
+
+export async function fetchSprintPodiumDriverIds(seasonYear: number, round: number) {
+  const paths = [`/f1/${seasonYear}/${round}/sprint.json`, `/f1/${seasonYear}/${round}/sprintresults.json`];
+
+  for (const path of paths) {
+    try {
+      const json = await getJson(path);
+      const race = (json.MRData?.RaceTable?.Races ?? [])[0];
+      const results = race?.SprintResults ?? race?.Results ?? [];
+      const p1 = results?.[0]?.Driver?.driverId ? String(results[0].Driver.driverId) : null;
+      const p2 = results?.[1]?.Driver?.driverId ? String(results[1].Driver.driverId) : null;
+      const p3 = results?.[2]?.Driver?.driverId ? String(results[2].Driver.driverId) : null;
+      if (p1 || p2 || p3) return { p1, p2, p3, raw: json };
+    } catch {
+      // try next endpoint
+    }
+  }
+
+  return { p1: null, p2: null, p3: null, raw: null };
+}

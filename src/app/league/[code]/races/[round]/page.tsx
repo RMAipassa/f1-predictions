@@ -6,13 +6,23 @@ import LiveUpdates from '@/components/LiveUpdates';
 import UniqueRaceSelects from '@/components/UniqueRaceSelects';
 
 function scoreRacePick(pred: any, result: any) {
-  if (!pred || !result) return { points: 0, breakdown: { pole: 0, p1: 0, p2: 0, p3: 0 } };
+  if (!pred || !result) {
+    return {
+      points: 0,
+      breakdown: { pole: 0, p1: 0, p2: 0, p3: 0, sprintPole: 0, sprintP1: 0, sprintP2: 0, sprintP3: 0 },
+    };
+  }
   const pole = pred.pole_driver_id && result.pole_driver_id && pred.pole_driver_id === result.pole_driver_id ? 1 : 0;
   const p1 = pred.p1_driver_id && result.p1_driver_id && pred.p1_driver_id === result.p1_driver_id ? 1 : 0;
   const p2 = pred.p2_driver_id && result.p2_driver_id && pred.p2_driver_id === result.p2_driver_id ? 1 : 0;
   const p3 = pred.p3_driver_id && result.p3_driver_id && pred.p3_driver_id === result.p3_driver_id ? 1 : 0;
-  const points = pole + p1 + p2 + p3;
-  return { points, breakdown: { pole, p1, p2, p3 } };
+  const sprintPole =
+    pred.sprint_pole_driver_id && result.sprint_pole_driver_id && pred.sprint_pole_driver_id === result.sprint_pole_driver_id ? 1 : 0;
+  const sprintP1 = pred.sprint_p1_driver_id && result.sprint_p1_driver_id && pred.sprint_p1_driver_id === result.sprint_p1_driver_id ? 1 : 0;
+  const sprintP2 = pred.sprint_p2_driver_id && result.sprint_p2_driver_id && pred.sprint_p2_driver_id === result.sprint_p2_driver_id ? 1 : 0;
+  const sprintP3 = pred.sprint_p3_driver_id && result.sprint_p3_driver_id && pred.sprint_p3_driver_id === result.sprint_p3_driver_id ? 1 : 0;
+  const points = pole + p1 + p2 + p3 + sprintPole + sprintP1 + sprintP2 + sprintP3;
+  return { points, breakdown: { pole, p1, p2, p3, sprintPole, sprintP1, sprintP2, sprintP3 } };
 }
 
 export default async function RaceRoundPage({ params }: { params: Promise<{ code: string; round: string }> }) {
@@ -47,7 +57,11 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
     .get(String(league.id), user.id, seasonYear, round) as any;
   const result = db()
     .prepare(
-      'select pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id, fetched_at from race_results where season_year = ? and round = ?'
+      `select pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id,
+              sprint_pole_driver_id, sprint_p1_driver_id, sprint_p2_driver_id, sprint_p3_driver_id,
+              fetched_at
+       from race_results
+       where season_year = ? and round = ?`
     )
     .get(seasonYear, round) as any;
 
@@ -362,6 +376,10 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
                   Pole: {result.pole_driver_id ?? '—'} | P1: {result.p1_driver_id ?? '—'} | P2: {result.p2_driver_id ?? '—'} | P3:{' '}
                   {result.p3_driver_id ?? '—'}
                 </div>
+                <div className="mt-2">
+                  Sprint Pole: {result.sprint_pole_driver_id ?? '—'} | Sprint P1: {result.sprint_p1_driver_id ?? '—'} | Sprint P2:{' '}
+                  {result.sprint_p2_driver_id ?? '—'} | Sprint P3: {result.sprint_p3_driver_id ?? '—'}
+                </div>
               </div>
             ) : (
               <div className="mt-2 text-sm muted">
@@ -383,11 +401,12 @@ export default async function RaceRoundPage({ params }: { params: Promise<{ code
           {scoring ? (
             <div className="mt-2 text-sm">
               <span className="mono">TOTAL {scoring.points}</span>
-              <span className="muted">
-                {' '}
-                (pole {scoring.breakdown.pole}, p1 {scoring.breakdown.p1}, p2 {scoring.breakdown.p2}, p3 {scoring.breakdown.p3})
-              </span>
-            </div>
+                <span className="muted">
+                  {' '}
+                  (pole {scoring.breakdown.pole}, p1 {scoring.breakdown.p1}, p2 {scoring.breakdown.p2}, p3 {scoring.breakdown.p3}, spole{' '}
+                  {scoring.breakdown.sprintPole}, sp1 {scoring.breakdown.sprintP1}, sp2 {scoring.breakdown.sprintP2}, sp3 {scoring.breakdown.sprintP3})
+                </span>
+              </div>
           ) : (
             <div className="mt-2 text-sm muted">Pending results.</div>
           )}

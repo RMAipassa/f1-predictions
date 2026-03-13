@@ -84,6 +84,10 @@ function migrate(db: Database.Database) {
       p1_driver_id text,
       p2_driver_id text,
       p3_driver_id text,
+      sprint_pole_driver_id text,
+      sprint_p1_driver_id text,
+      sprint_p2_driver_id text,
+      sprint_p3_driver_id text,
       source text not null,
       fetched_at text not null,
       raw_json text not null,
@@ -181,6 +185,18 @@ function migrate(db: Database.Database) {
     if (!cols.has('sprint_p1_driver_id')) db.prepare('alter table race_predictions add column sprint_p1_driver_id text').run();
     if (!cols.has('sprint_p2_driver_id')) db.prepare('alter table race_predictions add column sprint_p2_driver_id text').run();
     if (!cols.has('sprint_p3_driver_id')) db.prepare('alter table race_predictions add column sprint_p3_driver_id text').run();
+  } catch {
+    // ignore
+  }
+
+  try {
+    const cols = new Set(
+      (db.prepare("select name from pragma_table_info('race_results')").all() as any[]).map((r) => String(r.name))
+    );
+    if (!cols.has('sprint_pole_driver_id')) db.prepare('alter table race_results add column sprint_pole_driver_id text').run();
+    if (!cols.has('sprint_p1_driver_id')) db.prepare('alter table race_results add column sprint_p1_driver_id text').run();
+    if (!cols.has('sprint_p2_driver_id')) db.prepare('alter table race_results add column sprint_p2_driver_id text').run();
+    if (!cols.has('sprint_p3_driver_id')) db.prepare('alter table race_results add column sprint_p3_driver_id text').run();
   } catch {
     // ignore
   }

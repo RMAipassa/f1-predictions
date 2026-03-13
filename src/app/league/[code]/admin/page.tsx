@@ -396,9 +396,14 @@ export default async function LeagueAdminPage({
             <button className="w-full card-solid p-5 text-left transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" type="submit">
               <div className="mono text-xs muted">Results</div>
               <div className="mt-1 text-lg font-semibold">Sync completed race results</div>
-              <div className="mt-1 text-sm muted">Pole + podium certification.</div>
+              <div className="mt-1 text-sm muted">Race pole/podium + sprint results.</div>
             </button>
           </form>
+          <Link href={`/league/${league.code}/season/review`} className="w-full card-solid p-5 text-left transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]">
+            <div className="mono text-xs muted">Random</div>
+            <div className="mt-1 text-lg font-semibold">Review random predictions</div>
+            <div className="mt-1 text-sm muted">Mark correct/incorrect to award manual points.</div>
+          </Link>
           <form action={verifySeasonPredictions}>
             <button className="w-full card-solid p-5 text-left transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" type="submit">
               <div className="mono text-xs muted">Validation</div>

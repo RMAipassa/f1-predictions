@@ -13,6 +13,10 @@ function scoreRace(pred: any, result: any) {
   if (pred.p1_driver_id && result.p1_driver_id && pred.p1_driver_id === result.p1_driver_id) pts++;
   if (pred.p2_driver_id && result.p2_driver_id && pred.p2_driver_id === result.p2_driver_id) pts++;
   if (pred.p3_driver_id && result.p3_driver_id && pred.p3_driver_id === result.p3_driver_id) pts++;
+  if (pred.sprint_pole_driver_id && result.sprint_pole_driver_id && pred.sprint_pole_driver_id === result.sprint_pole_driver_id) pts++;
+  if (pred.sprint_p1_driver_id && result.sprint_p1_driver_id && pred.sprint_p1_driver_id === result.sprint_p1_driver_id) pts++;
+  if (pred.sprint_p2_driver_id && result.sprint_p2_driver_id && pred.sprint_p2_driver_id === result.sprint_p2_driver_id) pts++;
+  if (pred.sprint_p3_driver_id && result.sprint_p3_driver_id && pred.sprint_p3_driver_id === result.sprint_p3_driver_id) pts++;
   return pts;
 }
 
@@ -35,11 +39,21 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
     .all(String(league.id)) as any[];
   const preds = db()
     .prepare(
-      'select user_id, round, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id from race_predictions where league_id = ? and season_year = ?'
+      `select user_id, round,
+              pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id,
+              sprint_pole_driver_id, sprint_p1_driver_id, sprint_p2_driver_id, sprint_p3_driver_id
+       from race_predictions
+       where league_id = ? and season_year = ?`
     )
     .all(String(league.id), seasonYear) as any[];
   const results = db()
-    .prepare('select round, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id from race_results where season_year = ?')
+    .prepare(
+      `select round,
+              pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id,
+              sprint_pole_driver_id, sprint_p1_driver_id, sprint_p2_driver_id, sprint_p3_driver_id
+       from race_results
+       where season_year = ?`
+    )
     .all(seasonYear) as any[];
   const randomReviews = db()
     .prepare('select user_id, idx, is_correct from random_prediction_reviews where league_id = ? and season_year = ?')

@@ -5,6 +5,8 @@ import {
   fetchSeasonDrivers,
   fetchQualifyingPoleDriverId,
   fetchRacePodiumDriverIds,
+  fetchSprintPodiumDriverIds,
+  fetchSprintPoleDriverId,
 } from '@/lib/f1/ergast';
 import { publishEvent } from '@/lib/events';
 
@@ -65,7 +67,11 @@ export async function syncCompletedRaceResults(seasonYear: number) {
     .all(seasonYear) as any[];
 
   const existingByRound = new Map<number, any>();
-  for (const r of db().prepare('select round, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id from race_results where season_year = ?').all(seasonYear) as any[]) {
+  for (const r of db()
+    .prepare(
+      'select round, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id, sprint_pole_driver_id, sprint_p1_driver_id, sprint_p2_driver_id, sprint_p3_driver_id from race_results where season_year = ?'
+    )
+    .all(seasonYear) as any[]) {
     existingByRound.set(Number(r.round), r);
   }
 
@@ -73,13 +79,27 @@ export async function syncCompletedRaceResults(seasonYear: number) {
   const toSync = eligible;
 
   const upsert = db().prepare(
-    `insert into race_results (season_year, round, pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id, source, fetched_at, raw_json)
-     values (@season_year, @round, @pole_driver_id, @p1_driver_id, @p2_driver_id, @p3_driver_id, @source, @fetched_at, @raw_json)
+    `insert into race_results (
+       season_year, round,
+       pole_driver_id, p1_driver_id, p2_driver_id, p3_driver_id,
+       sprint_pole_driver_id, sprint_p1_driver_id, sprint_p2_driver_id, sprint_p3_driver_id,
+       source, fetched_at, raw_json
+     )
+     values (
+       @season_year, @round,
+       @pole_driver_id, @p1_driver_id, @p2_driver_id, @p3_driver_id,
+       @sprint_pole_driver_id, @sprint_p1_driver_id, @sprint_p2_driver_id, @sprint_p3_driver_id,
+       @source, @fetched_at, @raw_json
+     )
      on conflict (season_year, round) do update set
        pole_driver_id=excluded.pole_driver_id,
        p1_driver_id=excluded.p1_driver_id,
        p2_driver_id=excluded.p2_driver_id,
        p3_driver_id=excluded.p3_driver_id,
+       sprint_pole_driver_id=excluded.sprint_pole_driver_id,
+       sprint_p1_driver_id=excluded.sprint_p1_driver_id,
+       sprint_p2_driver_id=excluded.sprint_p2_driver_id,
+       sprint_p3_driver_id=excluded.sprint_p3_driver_id,
        source=excluded.source,
        fetched_at=excluded.fetched_at,
        raw_json=excluded.raw_json`
@@ -91,9 +111,11 @@ export async function syncCompletedRaceResults(seasonYear: number) {
   for (const r of toSync) {
     const round = Number(r.round);
     try {
-      const [pole, podium] = await Promise.all([
+      const [pole, podium, sprintPole, sprintPodium] = await Promise.all([
         fetchQualifyingPoleDriverId(seasonYear, round),
         fetchRacePodiumDriverIds(seasonYear, round),
+        fetchSprintPoleDriverId(seasonYear, round),
+        fetchSprintPodiumDriverIds(seasonYear, round),
       ]);
 
       if (!podium.p1) {
@@ -108,9 +130,13 @@ export async function syncCompletedRaceResults(seasonYear: number) {
         p1_driver_id: podium.p1,
         p2_driver_id: podium.p2,
         p3_driver_id: podium.p3,
+        sprint_pole_driver_id: sprintPole,
+        sprint_p1_driver_id: sprintPodium.p1,
+        sprint_p2_driver_id: sprintPodium.p2,
+        sprint_p3_driver_id: sprintPodium.p3,
         source: 'ergast-compatible',
         fetched_at: nowIso(),
-        raw_json: JSON.stringify(podium.raw ?? {}),
+        raw_json: JSON.stringify({ race: podium.raw ?? null, sprint: sprintPodium.raw ?? null }),
       };
 
       const prev = existingByRound.get(round);
@@ -119,7 +145,11 @@ export async function syncCompletedRaceResults(seasonYear: number) {
         String(prev.pole_driver_id ?? '') !== String(row.pole_driver_id ?? '') ||
         String(prev.p1_driver_id ?? '') !== String(row.p1_driver_id ?? '') ||
         String(prev.p2_driver_id ?? '') !== String(row.p2_driver_id ?? '') ||
-        String(prev.p3_driver_id ?? '') !== String(row.p3_driver_id ?? '');
+        String(prev.p3_driver_id ?? '') !== String(row.p3_driver_id ?? '') ||
+        String(prev.sprint_pole_driver_id ?? '') !== String(row.sprint_pole_driver_id ?? '') ||
+        String(prev.sprint_p1_driver_id ?? '') !== String(row.sprint_p1_driver_id ?? '') ||
+        String(prev.sprint_p2_driver_id ?? '') !== String(row.sprint_p2_driver_id ?? '') ||
+        String(prev.sprint_p3_driver_id ?? '') !== String(row.sprint_p3_driver_id ?? '');
 
       if (isChanged) {
         upsert.run(row);
