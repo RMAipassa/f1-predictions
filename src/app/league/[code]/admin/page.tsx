@@ -236,9 +236,19 @@ export default async function LeagueAdminPage({
         .sort((a, b) => a.round - b.round),
     };
 
+    const syncReportPayload = {
+      at: new Date().toISOString(),
+      eligibleRounds: out.eligibleRounds,
+      skippedDetails: out.skippedDetails,
+    };
+
     db()
       .prepare('insert into kv (k, v) values (?, ?) on conflict (k) do update set v = excluded.v')
       .run(`sync_delta:${freshLeague.id}:${seasonYear}`, JSON.stringify(deltaPayload));
+
+    db()
+      .prepare('insert into kv (k, v) values (?, ?) on conflict (k) do update set v = excluded.v')
+      .run(`sync_report:${freshLeague.id}:${seasonYear}`, JSON.stringify(syncReportPayload));
 
     redirect(
       `/league/${p.code}/admin/results?eligible=${out.eligible}&synced=${out.synced}&skipped=${out.skipped}&changed=${out.changed}`

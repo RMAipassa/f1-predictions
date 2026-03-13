@@ -92,6 +92,7 @@ export async function syncCompletedRaceResults(seasonYear: number) {
       hasStarted(r.race_start)
   );
   const toSync = eligible;
+  const eligibleRounds = toSync.map((r) => Number(r.round));
 
   const upsert = db().prepare(
     `insert into race_results (
@@ -123,6 +124,7 @@ export async function syncCompletedRaceResults(seasonYear: number) {
   let synced = 0;
   let skipped = 0;
   let changed = 0;
+  const skippedDetails: Array<{ round: number; reason: 'no_data' | 'fetch_error' }> = [];
   for (const r of toSync) {
     const round = Number(r.round);
     try {
@@ -208,6 +210,7 @@ export async function syncCompletedRaceResults(seasonYear: number) {
 
       if (!hasAnyData) {
         skipped++;
+        skippedDetails.push({ round, reason: 'no_data' });
         continue;
       }
 
@@ -230,8 +233,9 @@ export async function syncCompletedRaceResults(seasonYear: number) {
       synced++;
     } catch {
       skipped++;
+      skippedDetails.push({ round, reason: 'fetch_error' });
     }
   }
 
-  return { eligible: eligible.length, toSync: toSync.length, synced, skipped, changed };
+  return { eligible: eligible.length, toSync: toSync.length, synced, skipped, changed, eligibleRounds, skippedDetails };
 }

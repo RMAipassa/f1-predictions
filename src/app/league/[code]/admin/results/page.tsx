@@ -49,6 +49,9 @@ export default async function AdminSyncedResultsPage({
   const deltaRow = db()
     .prepare('select v from kv where k = ?')
     .get(`sync_delta:${league.id}:${seasonYear}`) as any;
+  const reportRow = db()
+    .prepare('select v from kv where k = ?')
+    .get(`sync_report:${league.id}:${seasonYear}`) as any;
 
   let deltaData: {
     at: string;
@@ -60,6 +63,22 @@ export default async function AdminSyncedResultsPage({
   } catch {
     deltaData = null;
   }
+
+  let reportData: {
+    at: string;
+    eligibleRounds: number[];
+    skippedDetails: Array<{ round: number; reason: 'no_data' | 'fetch_error' }>;
+  } | null = null;
+  try {
+    if (reportRow?.v) reportData = JSON.parse(String(reportRow.v));
+  } catch {
+    reportData = null;
+  }
+
+  const skippedReasonLabel: Record<'no_data' | 'fetch_error', string> = {
+    no_data: 'No published data yet for any ready part of the round',
+    fetch_error: 'Fetch/API error while syncing this round',
+  };
 
   return (
     <main className="app-bg">
@@ -114,6 +133,38 @@ export default async function AdminSyncedResultsPage({
                       <div key={r.round} className="flex items-center justify-between gap-3">
                         <span>Round {r.round}</span>
                         <span className="mono">{r.delta > 0 ? `+${r.delta}` : String(r.delta)}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {reportData ? (
+            <div className="mb-5 grid gap-3 md:grid-cols-2">
+              <div className="card p-4">
+                <div className="font-semibold">Eligible rounds this run</div>
+                <div className="mt-1 text-xs muted">Rounds whose session times had already started</div>
+                <div className="mt-3 text-sm">
+                  {reportData.eligibleRounds.length === 0 ? (
+                    <div className="muted">None.</div>
+                  ) : (
+                    <div className="mono">{reportData.eligibleRounds.join(', ')}</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="card p-4">
+                <div className="font-semibold">Skipped rounds</div>
+                <div className="mt-1 text-xs muted">Why each round was skipped in this sync</div>
+                <div className="mt-3 grid gap-2 text-sm">
+                  {reportData.skippedDetails.length === 0 ? (
+                    <div className="muted">No skipped rounds.</div>
+                  ) : (
+                    reportData.skippedDetails.map((s, idx) => (
+                      <div key={`${s.round}:${idx}`}>
+                        <span className="mono">Round {s.round}</span> - {skippedReasonLabel[s.reason]}
                       </div>
                     ))
                   )}
