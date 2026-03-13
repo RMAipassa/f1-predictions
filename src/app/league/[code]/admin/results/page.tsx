@@ -46,6 +46,32 @@ export default async function AdminSyncedResultsPage({
     )
     .all(seasonYear) as any[];
 
+  async function setManualSprintPole(formData: FormData) {
+    'use server';
+
+    const targetRound = Number(formData.get('target_round') ?? 0);
+    const sprintPoleDriverIdRaw = String(formData.get('sprint_pole_driver_id') ?? '').trim();
+    if (!Number.isFinite(targetRound) || targetRound <= 0) return;
+
+    const { league: freshLeague, member: freshMember, user: freshUser } = await getLeagueByCode(p.code);
+    if (!freshLeague || !freshUser || !freshMember || freshMember.role !== 'owner') return;
+
+    const validDriverIds = new Set(
+      (db().prepare('select driver_id from drivers').all() as any[]).map((r) => String(r.driver_id))
+    );
+    const sprintPoleDriverId = sprintPoleDriverIdRaw || null;
+    if (sprintPoleDriverId && !validDriverIds.has(sprintPoleDriverId)) return;
+
+    db()
+      .prepare('update race_results set sprint_pole_driver_id = ? where season_year = ? and round = ?')
+      .run(sprintPoleDriverId, seasonYear, targetRound);
+
+    const { publishEvent } = await import('@/lib/events');
+    publishEvent('race_results_updated', { seasonYear, round: targetRound, at: new Date().toISOString() });
+
+    redirect(`/league/${p.code}/admin/results`);
+  }
+
   const deltaRow = db()
     .prepare('select v from kv where k = ?')
     .get(`sync_delta:${league.id}:${seasonYear}`) as any;
@@ -211,6 +237,35 @@ export default async function AdminSyncedResultsPage({
           {rows.length === 0 ? (
             <div className="p-4 text-sm muted">No race results saved yet for this season.</div>
           ) : null}
+        </div>
+
+        <div className="mt-6 card-solid p-4">
+          <div className="font-semibold">Manual sprint pole override</div>
+          <div className="mt-1 text-sm muted">
+            If sprint pole is missing from APIs, set it manually here. Winner is never used as sprint pole.
+          </div>
+
+          <div className="mt-4 grid gap-2">
+            {rows.map((r) => (
+              <form key={`manual:${Number(r.round)}`} action={setManualSprintPole} className="grid gap-2 md:grid-cols-[1fr_1fr_auto] items-center">
+                <input type="hidden" name="target_round" value={Number(r.round)} />
+                <div className="text-sm">
+                  <span className="mono">Round {Number(r.round)}</span> {String(r.name)}
+                </div>
+                <select className="field text-sm" name="sprint_pole_driver_id" defaultValue={r.sprint_pole_driver_id ? String(r.sprint_pole_driver_id) : ''}>
+                  <option value="">— clear —</option>
+                  {drivers.map((d) => (
+                    <option key={String(d.driver_id)} value={String(d.driver_id)}>
+                      {String(d.family_name)}, {String(d.given_name)}{d.code ? ` (${String(d.code)})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button className="btn" type="submit">Save pole</button>
+              </form>
+            ))}
+
+            {rows.length === 0 ? <div className="text-sm muted">No rounds with synced results yet.</div> : null}
+          </div>
         </div>
       </div>
     </main>

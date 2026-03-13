@@ -6,14 +6,27 @@ type ErgastResponse = {
   };
 };
 
-function baseUrl() {
-  return (process.env.F1_RESULTS_BASE_URL || 'https://api.jolpi.ca/ergast').replace(/\/$/, '');
+function baseUrls() {
+  const primary = (process.env.F1_RESULTS_BASE_URL || 'https://api.jolpi.ca/ergast').replace(/\/$/, '');
+  const envFallback = (process.env.F1_RESULTS_FALLBACK_BASE_URL || '').replace(/\/$/, '');
+  const urls = [primary, envFallback].filter(Boolean);
+  return Array.from(new Set(urls));
 }
 
 async function getJson(path: string): Promise<ErgastResponse> {
-  const res = await fetch(`${baseUrl()}${path}`, { next: { revalidate: 0 } });
-  if (!res.ok) throw new Error(`F1 API error ${res.status} for ${path}`);
-  return (await res.json()) as ErgastResponse;
+  let lastError: Error | null = null;
+
+  for (const base of baseUrls()) {
+    try {
+      const res = await fetch(`${base}${path}`, { next: { revalidate: 0 } });
+      if (!res.ok) throw new Error(`F1 API error ${res.status} for ${path}`);
+      return (await res.json()) as ErgastResponse;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+
+  throw lastError ?? new Error(`F1 API error for ${path}`);
 }
 
 export async function fetchSeasonCalendar(seasonYear: number) {
@@ -90,7 +103,11 @@ export async function fetchRacePodiumDriverIds(seasonYear: number, round: number
 }
 
 export async function fetchSprintPoleDriverId(seasonYear: number, round: number) {
-  const paths = [`/f1/${seasonYear}/${round}/sprintqualifying.json`, `/f1/${seasonYear}/${round}/sprintshootout.json`];
+  const paths = [
+    `/f1/${seasonYear}/${round}/sprintqualifying.json`,
+    `/f1/${seasonYear}/${round}/sprintshootout.json`,
+    `/f1/${seasonYear}/${round}/sprintshootoutresults.json`,
+  ];
 
   for (const path of paths) {
     try {
@@ -105,6 +122,69 @@ export async function fetchSprintPoleDriverId(seasonYear: number, round: number)
   }
 
   return null;
+}
+
+export async function fetchSprintGridPoleDriverId(seasonYear: number, round: number) {
+  const paths = [`/f1/${seasonYear}/${round}/sprint.json`, `/f1/${seasonYear}/${round}/sprintresults.json`];
+
+  for (const path of paths) {
+    try {
+      const json = await getJson(path);
+      const race = (json.MRData?.RaceTable?.Races ?? [])[0];
+      const results = race?.SprintResults ?? race?.Results ?? [];
+      const onGridPole = results.find((r: any) => String(r?.grid ?? '') === '1');
+      const gridPoleId = onGridPole?.Driver?.driverId;
+      if (gridPoleId) return String(gridPoleId);
+    } catch {
+      // try next endpoint
+    }
+  }
+
+  return null;
+}
+
+type OpenF1Session = {
+  session_key?: number;
+  date_start?: string;
+};
+
+type OpenF1SessionResult = {
+  position?: number;
+  driver_number?: number;
+};
+
+async function getOpenF1Json<T>(pathWithQuery: string): Promise<T> {
+  const res = await fetch(`https://api.openf1.org/v1${pathWithQuery}`, { next: { revalidate: 0 } });
+  if (!res.ok) throw new Error(`OpenF1 API error ${res.status} for ${pathWithQuery}`);
+  return (await res.json()) as T;
+}
+
+export async function fetchOpenF1SprintQualiPoleDriverNumber(seasonYear: number, scheduledSprintQualiStart?: string | null) {
+  const qs = new URLSearchParams({ year: String(seasonYear), session_name: 'Sprint Qualifying' });
+  const sessions = await getOpenF1Json<OpenF1Session[]>(`/sessions?${qs.toString()}`);
+  if (!Array.isArray(sessions) || sessions.length === 0) return null;
+
+  let selected = sessions[0];
+  const targetTs = scheduledSprintQualiStart ? new Date(String(scheduledSprintQualiStart)).getTime() : NaN;
+  if (Number.isFinite(targetTs)) {
+    let bestDiff = Number.POSITIVE_INFINITY;
+    for (const s of sessions) {
+      const ts = s?.date_start ? new Date(String(s.date_start)).getTime() : NaN;
+      if (!Number.isFinite(ts)) continue;
+      const diff = Math.abs(ts - targetTs);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        selected = s;
+      }
+    }
+  }
+
+  const sessionKey = Number(selected?.session_key ?? 0);
+  if (!Number.isFinite(sessionKey) || sessionKey <= 0) return null;
+
+  const results = await getOpenF1Json<OpenF1SessionResult[]>(`/session_result?session_key=${sessionKey}`);
+  const winner = (results ?? []).find((r) => Number(r?.position) === 1 && Number.isFinite(Number(r?.driver_number)));
+  return winner?.driver_number ? String(winner.driver_number) : null;
 }
 
 export async function fetchSprintPodiumDriverIds(seasonYear: number, round: number) {

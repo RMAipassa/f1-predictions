@@ -5,6 +5,8 @@ import {
   fetchSeasonDrivers,
   fetchQualifyingPoleDriverId,
   fetchRacePodiumDriverIds,
+  fetchOpenF1SprintQualiPoleDriverNumber,
+  fetchSprintGridPoleDriverId,
   fetchSprintPodiumDriverIds,
   fetchSprintPoleDriverId,
 } from '@/lib/f1/ergast';
@@ -82,6 +84,13 @@ export async function syncCompletedRaceResults(seasonYear: number) {
     )
     .all(seasonYear) as any[]) {
     existingByRound.set(Number(r.round), r);
+  }
+
+  const driverIdByPermanentNumber = new Map<string, string>();
+  for (const d of db().prepare('select driver_id, permanent_number from drivers').all() as any[]) {
+    const num = d?.permanent_number ? String(d.permanent_number).trim() : '';
+    const driverId = d?.driver_id ? String(d.driver_id).trim() : '';
+    if (num && driverId) driverIdByPermanentNumber.set(num, driverId);
   }
 
   const eligible = raceRows.filter(
@@ -171,6 +180,26 @@ export async function syncCompletedRaceResults(seasonYear: number) {
           sprintPole = await fetchSprintPoleDriverId(seasonYear, round);
         } catch {
           // ignore partial fetch errors
+        }
+
+        if (!sprintPole) {
+          try {
+            const openF1Number = await fetchOpenF1SprintQualiPoleDriverNumber(
+              seasonYear,
+              r?.sprint_quali_start ? String(r.sprint_quali_start) : null
+            );
+            if (openF1Number) sprintPole = driverIdByPermanentNumber.get(openF1Number) ?? null;
+          } catch {
+            // ignore fallback source errors
+          }
+        }
+
+        if (!sprintPole && sprintPodiumReady) {
+          try {
+            sprintPole = await fetchSprintGridPoleDriverId(seasonYear, round);
+          } catch {
+            // ignore fallback errors
+          }
         }
       }
 
