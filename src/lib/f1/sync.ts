@@ -62,8 +62,17 @@ export async function syncSeasonData(seasonYear: number) {
 }
 
 export async function syncCompletedRaceResults(seasonYear: number) {
+  const nowTs = Date.now();
+  const hasStarted = (value: unknown) => {
+    if (!value) return false;
+    const ts = new Date(String(value)).getTime();
+    return Number.isFinite(ts) && ts < nowTs;
+  };
+
   const raceRows = db()
-    .prepare('select round, race_start from races where season_year = ? order by round asc')
+    .prepare(
+      'select round, quali_start, sprint_quali_start, sprint_race_start, race_start from races where season_year = ? order by round asc'
+    )
     .all(seasonYear) as any[];
 
   const existingByRound = new Map<number, any>();
@@ -75,7 +84,13 @@ export async function syncCompletedRaceResults(seasonYear: number) {
     existingByRound.set(Number(r.round), r);
   }
 
-  const eligible = raceRows.filter((r) => r.race_start && new Date(String(r.race_start)).getTime() < Date.now());
+  const eligible = raceRows.filter(
+    (r) =>
+      hasStarted(r.quali_start) ||
+      hasStarted(r.sprint_quali_start) ||
+      hasStarted(r.sprint_race_start) ||
+      hasStarted(r.race_start)
+  );
   const toSync = eligible;
 
   const upsert = db().prepare(
@@ -111,35 +126,91 @@ export async function syncCompletedRaceResults(seasonYear: number) {
   for (const r of toSync) {
     const round = Number(r.round);
     try {
-      const [pole, podium, sprintPole, sprintPodium] = await Promise.all([
-        fetchQualifyingPoleDriverId(seasonYear, round),
-        fetchRacePodiumDriverIds(seasonYear, round),
-        fetchSprintPoleDriverId(seasonYear, round),
-        fetchSprintPodiumDriverIds(seasonYear, round),
-      ]);
+      const prev = existingByRound.get(round);
 
-      if (!podium.p1) {
-        skipped++;
-        continue;
+      const racePoleReady = hasStarted(r.quali_start) || hasStarted(r.race_start);
+      const racePodiumReady = hasStarted(r.race_start);
+      const sprintPoleReady = hasStarted(r.sprint_quali_start) || hasStarted(r.sprint_race_start) || hasStarted(r.race_start);
+      const sprintPodiumReady = hasStarted(r.sprint_race_start) || hasStarted(r.race_start);
+
+      let pole: string | null = null;
+      let racePodium: { p1: string | null; p2: string | null; p3: string | null; raw: unknown } = {
+        p1: null,
+        p2: null,
+        p3: null,
+        raw: null,
+      };
+      let sprintPole: string | null = null;
+      let sprintPodium: { p1: string | null; p2: string | null; p3: string | null; raw: unknown } = {
+        p1: null,
+        p2: null,
+        p3: null,
+        raw: null,
+      };
+
+      if (racePoleReady) {
+        try {
+          pole = await fetchQualifyingPoleDriverId(seasonYear, round);
+        } catch {
+          // ignore partial fetch errors
+        }
+      }
+
+      if (racePodiumReady) {
+        try {
+          racePodium = await fetchRacePodiumDriverIds(seasonYear, round);
+        } catch {
+          // ignore partial fetch errors
+        }
+      }
+
+      if (sprintPoleReady) {
+        try {
+          sprintPole = await fetchSprintPoleDriverId(seasonYear, round);
+        } catch {
+          // ignore partial fetch errors
+        }
+      }
+
+      if (sprintPodiumReady) {
+        try {
+          sprintPodium = await fetchSprintPodiumDriverIds(seasonYear, round);
+        } catch {
+          // ignore partial fetch errors
+        }
       }
 
       const row = {
         season_year: seasonYear,
         round,
-        pole_driver_id: pole,
-        p1_driver_id: podium.p1,
-        p2_driver_id: podium.p2,
-        p3_driver_id: podium.p3,
-        sprint_pole_driver_id: sprintPole,
-        sprint_p1_driver_id: sprintPodium.p1,
-        sprint_p2_driver_id: sprintPodium.p2,
-        sprint_p3_driver_id: sprintPodium.p3,
+        pole_driver_id: pole ?? (prev?.pole_driver_id ? String(prev.pole_driver_id) : null),
+        p1_driver_id: racePodium.p1 ?? (prev?.p1_driver_id ? String(prev.p1_driver_id) : null),
+        p2_driver_id: racePodium.p2 ?? (prev?.p2_driver_id ? String(prev.p2_driver_id) : null),
+        p3_driver_id: racePodium.p3 ?? (prev?.p3_driver_id ? String(prev.p3_driver_id) : null),
+        sprint_pole_driver_id: sprintPole ?? (prev?.sprint_pole_driver_id ? String(prev.sprint_pole_driver_id) : null),
+        sprint_p1_driver_id: sprintPodium.p1 ?? (prev?.sprint_p1_driver_id ? String(prev.sprint_p1_driver_id) : null),
+        sprint_p2_driver_id: sprintPodium.p2 ?? (prev?.sprint_p2_driver_id ? String(prev.sprint_p2_driver_id) : null),
+        sprint_p3_driver_id: sprintPodium.p3 ?? (prev?.sprint_p3_driver_id ? String(prev.sprint_p3_driver_id) : null),
         source: 'ergast-compatible',
         fetched_at: nowIso(),
-        raw_json: JSON.stringify({ race: podium.raw ?? null, sprint: sprintPodium.raw ?? null }),
+        raw_json: JSON.stringify({ race: racePodium.raw ?? null, sprint: sprintPodium.raw ?? null }),
       };
 
-      const prev = existingByRound.get(round);
+      const hasAnyData =
+        row.pole_driver_id ||
+        row.p1_driver_id ||
+        row.p2_driver_id ||
+        row.p3_driver_id ||
+        row.sprint_pole_driver_id ||
+        row.sprint_p1_driver_id ||
+        row.sprint_p2_driver_id ||
+        row.sprint_p3_driver_id;
+
+      if (!hasAnyData) {
+        skipped++;
+        continue;
+      }
+
       const isChanged =
         !prev ||
         String(prev.pole_driver_id ?? '') !== String(row.pole_driver_id ?? '') ||
