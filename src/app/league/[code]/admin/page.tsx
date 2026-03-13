@@ -5,6 +5,7 @@ import { syncCompletedRaceResults, syncSeasonData } from '@/lib/f1/sync';
 import { db } from '@/lib/db';
 import { decideJoinRequest, deleteLeague } from '@/lib/leagues';
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
+import PendingSubmitButton from '@/components/PendingSubmitButton';
 
 function parseObj(json: string) {
   try {
@@ -114,7 +115,17 @@ export default async function LeagueAdminPage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ verify?: string }>;
+  searchParams: Promise<{
+    verify?: string;
+    sync?: string;
+    races?: string;
+    drivers?: string;
+    constructors?: string;
+    eligible?: string;
+    synced?: string;
+    skipped?: string;
+    changed?: string;
+  }>;
 }) {
   const p = await params;
   const sp = await searchParams;
@@ -127,12 +138,18 @@ export default async function LeagueAdminPage({
 
   async function syncSeason() {
     'use server';
-    await syncSeasonData(seasonYear);
+    const out = await syncSeasonData(seasonYear);
+    redirect(
+      `/league/${p.code}/admin?sync=season&races=${out.races}&drivers=${out.drivers}&constructors=${out.constructors}`
+    );
   }
 
   async function syncResults() {
     'use server';
-    await syncCompletedRaceResults(seasonYear);
+    const out = await syncCompletedRaceResults(seasonYear);
+    redirect(
+      `/league/${p.code}/admin?sync=results&eligible=${out.eligible}&synced=${out.synced}&skipped=${out.skipped}&changed=${out.changed}`
+    );
   }
 
   async function verifySeasonPredictions() {
@@ -280,6 +297,12 @@ export default async function LeagueAdminPage({
 
   const shouldVerifySeason = sp.verify === 'season';
   const shouldVerifyRace = sp.verify === 'race';
+  const syncMessage =
+    sp.sync === 'season'
+      ? `Season data synced. Races: ${Number(sp.races ?? 0)}, Drivers: ${Number(sp.drivers ?? 0)}, Constructors: ${Number(sp.constructors ?? 0)}.`
+      : sp.sync === 'results'
+      ? `Results sync finished. Eligible rounds: ${Number(sp.eligible ?? 0)}, Synced: ${Number(sp.synced ?? 0)}, Changed: ${Number(sp.changed ?? 0)}, Skipped: ${Number(sp.skipped ?? 0)}.`
+      : null;
 
   const invalidSeasonPredictions = shouldVerifySeason
     ? (() => {
@@ -386,18 +409,36 @@ export default async function LeagueAdminPage({
 
         <div className="mt-8 grid gap-3">
           <form action={syncSeason}>
-            <button className="w-full card-solid p-5 text-left transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" type="submit">
+            <PendingSubmitButton
+              className="w-full card-solid p-5 text-left transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)] disabled:opacity-70"
+              pendingChildren={
+                <>
+                  <div className="mono text-xs muted">Data</div>
+                  <div className="mt-1 text-lg font-semibold">Syncing season data...</div>
+                  <div className="mt-1 text-sm muted">Fetching races, drivers, constructors.</div>
+                </>
+              }
+            >
               <div className="mono text-xs muted">Data</div>
               <div className="mt-1 text-lg font-semibold">Sync season data</div>
               <div className="mt-1 text-sm muted">Races, drivers, constructors.</div>
-            </button>
+            </PendingSubmitButton>
           </form>
           <form action={syncResults}>
-            <button className="w-full card-solid p-5 text-left transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" type="submit">
+            <PendingSubmitButton
+              className="w-full card-solid p-5 text-left transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)] disabled:opacity-70"
+              pendingChildren={
+                <>
+                  <div className="mono text-xs muted">Results</div>
+                  <div className="mt-1 text-lg font-semibold">Syncing results...</div>
+                  <div className="mt-1 text-sm muted">Race pole/podium + sprint results.</div>
+                </>
+              }
+            >
               <div className="mono text-xs muted">Results</div>
               <div className="mt-1 text-lg font-semibold">Sync completed race results</div>
               <div className="mt-1 text-sm muted">Race pole/podium + sprint results.</div>
-            </button>
+            </PendingSubmitButton>
           </form>
           <Link href={`/league/${league.code}/season/review`} className="w-full card-solid p-5 text-left transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]">
             <div className="mono text-xs muted">Random</div>
@@ -419,6 +460,13 @@ export default async function LeagueAdminPage({
             </button>
           </form>
         </div>
+
+        {syncMessage ? (
+          <div className="mt-4 card-solid p-4 text-sm">
+            <div className="font-semibold">Sync status</div>
+            <div className="mt-1 muted">{syncMessage}</div>
+          </div>
+        ) : null}
 
         <div className="mt-10">
           <div className="mono text-xs muted">LOCK OVERRIDES</div>
