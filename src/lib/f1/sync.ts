@@ -138,11 +138,12 @@ export async function syncCompletedRaceResults(seasonYear: number) {
     const round = Number(r.round);
     try {
       const prev = existingByRound.get(round);
+      const hasSprintWeekend = Boolean(r?.sprint_quali_start || r?.sprint_race_start);
 
       const racePoleReady = hasStarted(r.quali_start) || hasStarted(r.race_start);
       const racePodiumReady = hasStarted(r.race_start);
-      const sprintPoleReady = hasStarted(r.sprint_quali_start) || hasStarted(r.sprint_race_start) || hasStarted(r.race_start);
-      const sprintPodiumReady = hasStarted(r.sprint_race_start) || hasStarted(r.race_start);
+      const sprintPoleReady = hasSprintWeekend && (hasStarted(r.sprint_quali_start) || hasStarted(r.sprint_race_start) || hasStarted(r.race_start));
+      const sprintPodiumReady = hasSprintWeekend && (hasStarted(r.sprint_race_start) || hasStarted(r.race_start));
 
       let pole: string | null = null;
       let racePodium: { p1: string | null; p2: string | null; p3: string | null; raw: unknown } = {
@@ -218,10 +219,18 @@ export async function syncCompletedRaceResults(seasonYear: number) {
         p1_driver_id: racePodium.p1 ?? (prev?.p1_driver_id ? String(prev.p1_driver_id) : null),
         p2_driver_id: racePodium.p2 ?? (prev?.p2_driver_id ? String(prev.p2_driver_id) : null),
         p3_driver_id: racePodium.p3 ?? (prev?.p3_driver_id ? String(prev.p3_driver_id) : null),
-        sprint_pole_driver_id: sprintPole ?? (prev?.sprint_pole_driver_id ? String(prev.sprint_pole_driver_id) : null),
-        sprint_p1_driver_id: sprintPodium.p1 ?? (prev?.sprint_p1_driver_id ? String(prev.sprint_p1_driver_id) : null),
-        sprint_p2_driver_id: sprintPodium.p2 ?? (prev?.sprint_p2_driver_id ? String(prev.sprint_p2_driver_id) : null),
-        sprint_p3_driver_id: sprintPodium.p3 ?? (prev?.sprint_p3_driver_id ? String(prev.sprint_p3_driver_id) : null),
+        sprint_pole_driver_id: hasSprintWeekend
+          ? sprintPole ?? (prev?.sprint_pole_driver_id ? String(prev.sprint_pole_driver_id) : null)
+          : null,
+        sprint_p1_driver_id: hasSprintWeekend
+          ? sprintPodium.p1 ?? (prev?.sprint_p1_driver_id ? String(prev.sprint_p1_driver_id) : null)
+          : null,
+        sprint_p2_driver_id: hasSprintWeekend
+          ? sprintPodium.p2 ?? (prev?.sprint_p2_driver_id ? String(prev.sprint_p2_driver_id) : null)
+          : null,
+        sprint_p3_driver_id: hasSprintWeekend
+          ? sprintPodium.p3 ?? (prev?.sprint_p3_driver_id ? String(prev.sprint_p3_driver_id) : null)
+          : null,
         source: 'ergast-compatible',
         fetched_at: nowIso(),
         raw_json: JSON.stringify({ race: racePodium.raw ?? null, sprint: sprintPodium.raw ?? null }),

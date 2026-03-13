@@ -160,12 +160,14 @@ async function getOpenF1Json<T>(pathWithQuery: string): Promise<T> {
 }
 
 export async function fetchOpenF1SprintQualiPoleDriverNumber(seasonYear: number, scheduledSprintQualiStart?: string | null) {
+  if (!scheduledSprintQualiStart) return null;
+
   const qs = new URLSearchParams({ year: String(seasonYear), session_name: 'Sprint Qualifying' });
   const sessions = await getOpenF1Json<OpenF1Session[]>(`/sessions?${qs.toString()}`);
   if (!Array.isArray(sessions) || sessions.length === 0) return null;
 
   let selected = sessions[0];
-  const targetTs = scheduledSprintQualiStart ? new Date(String(scheduledSprintQualiStart)).getTime() : NaN;
+  const targetTs = new Date(String(scheduledSprintQualiStart)).getTime();
   if (Number.isFinite(targetTs)) {
     let bestDiff = Number.POSITIVE_INFINITY;
     for (const s of sessions) {
