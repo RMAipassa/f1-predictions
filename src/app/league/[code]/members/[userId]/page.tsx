@@ -29,16 +29,36 @@ function scoreRacePick(pred: any, result: any) {
 
 export default async function MemberPredictionsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string; userId: string }>;
+  searchParams: Promise<{ season?: string }>;
 }) {
   const p = await params;
+  const sp = await searchParams;
   const { league, user } = await getLeagueByCode(p.code);
   if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/leaderboard`)}`);
   if (!league) return notFound();
 
   const targetUserId = String(p.userId);
-  const seasonYear = new Date().getUTCFullYear();
+  const currentSeasonYear = new Date().getUTCFullYear();
+
+  const seasonRows = db()
+    .prepare(
+      `select distinct season_year as year from race_predictions where league_id = ? and user_id = ?
+       union
+       select distinct season_year as year from season_predictions where league_id = ? and user_id = ?
+       union
+       select distinct season_year as year from random_prediction_reviews where league_id = ? and user_id = ?
+       order by year desc`
+    )
+    .all(String(league.id), targetUserId, String(league.id), targetUserId, String(league.id), targetUserId) as any[];
+
+  const seasonOptions = Array.from(new Set([currentSeasonYear, ...seasonRows.map((r) => Number(r.year)).filter(Number.isFinite)])).sort(
+    (a, b) => b - a
+  );
+  const requestedSeason = Number(sp.season ?? currentSeasonYear);
+  const seasonYear = Number.isFinite(requestedSeason) && seasonOptions.includes(requestedSeason) ? requestedSeason : currentSeasonYear;
   const viewerIsOwner = String(league.owner_id) === user.id;
   const viewerIsSelf = user.id === targetUserId;
 
@@ -128,10 +148,18 @@ export default async function MemberPredictionsPage({
             <Link className="btn" href={`/league/${league.code}`}>
               League
             </Link>
-            <Link className="btn" href={`/league/${league.code}/leaderboard`}>
+            <Link className="btn" href={`/league/${league.code}/leaderboard?season=${seasonYear}`}>
               Leaderboard
             </Link>
           </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          {seasonOptions.map((y) => (
+            <Link key={y} className={`btn ${y === seasonYear ? 'btn-primary' : ''}`} href={`/league/${league.code}/members/${targetUserId}?season=${y}`}>
+              {y}
+            </Link>
+          ))}
         </div>
 
         <section className="mt-8 card-solid p-5">

@@ -5,6 +5,7 @@ import { syncCompletedRaceResults, syncSeasonData } from '@/lib/f1/sync';
 import { db } from '@/lib/db';
 import { decideJoinRequest, deleteLeague } from '@/lib/leagues';
 import ConfirmSubmitButton from '@/components/ConfirmSubmitButton';
+import DoubleConfirmSubmitButton from '@/components/DoubleConfirmSubmitButton';
 import PendingSubmitButton from '@/components/PendingSubmitButton';
 
 function parseObj(json: string) {
@@ -754,7 +755,13 @@ export default async function LeagueAdminPage({
             <div className="text-lg font-semibold">Delete league</div>
             <div className="mt-1 text-sm muted">This removes the league and all its predictions/results for all members.</div>
             <form action={del} className="mt-4">
-              <button className="btn" type="submit">Delete permanently</button>
+              <DoubleConfirmSubmitButton
+                className="btn"
+                firstMessage={`Delete league \"${league.name}\"? This will remove all league data for every member.`}
+                secondMessage="Final confirmation: this action is irreversible. Delete permanently?"
+              >
+                Delete permanently
+              </DoubleConfirmSubmitButton>
             </form>
           </div>
         </div>

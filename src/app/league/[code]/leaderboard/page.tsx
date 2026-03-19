@@ -20,14 +20,7 @@ function scoreRace(pred: any, result: any) {
   return pts;
 }
 
-export default async function LeaderboardPage({ params }: { params: Promise<{ code: string }> }) {
-  const p = await params;
-  const { league, user } = await getLeagueByCode(p.code);
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/leaderboard`)}`);
-  if (!league) return notFound();
-
-  const seasonYear = new Date().getUTCFullYear();
-
+function buildSeasonRows(leagueId: string, seasonYear: number) {
   const members = db()
     .prepare(
       `select lm.user_id, lm.role, u.nickname
@@ -36,7 +29,8 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
        where lm.league_id = ?
        order by u.nickname asc`
     )
-    .all(String(league.id)) as any[];
+    .all(leagueId) as any[];
+
   const preds = db()
     .prepare(
       `select user_id, round,
@@ -45,7 +39,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
        from race_predictions
        where league_id = ? and season_year = ?`
     )
-    .all(String(league.id), seasonYear) as any[];
+    .all(leagueId, seasonYear) as any[];
   const results = db()
     .prepare(
       `select round,
@@ -57,7 +51,7 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
     .all(seasonYear) as any[];
   const randomReviews = db()
     .prepare('select user_id, idx, is_correct from random_prediction_reviews where league_id = ? and season_year = ?')
-    .all(String(league.id), seasonYear) as any[];
+    .all(leagueId, seasonYear) as any[];
 
   const resultsByRound = new Map<number, any>();
   for (const r of results ?? []) resultsByRound.set(Number(r.round), r);
@@ -91,8 +85,56 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
       total: racePts + randomPts,
     };
   });
+  rows.sort((a, b) => b.total - a.total || a.nickname.localeCompare(b.nickname));
+  return rows;
+}
 
-  rows.sort((a, b) => b.total - a.total);
+export default async function LeaderboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ code: string }>;
+  searchParams: Promise<{ season?: string }>;
+}) {
+  const p = await params;
+  const sp = await searchParams;
+  const { league, user } = await getLeagueByCode(p.code);
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/league/${p.code}/leaderboard`)}`);
+  if (!league) return notFound();
+
+  const currentSeasonYear = new Date().getUTCFullYear();
+
+  const seasonRows = db()
+    .prepare(
+      `select distinct season_year as year from race_predictions where league_id = ?
+       union
+       select distinct season_year as year from random_prediction_reviews where league_id = ?
+       union
+       select distinct season_year as year from season_predictions where league_id = ?
+       order by year desc`
+    )
+    .all(String(league.id), String(league.id), String(league.id)) as any[];
+
+  const seasonOptions = Array.from(new Set([currentSeasonYear, ...seasonRows.map((r) => Number(r.year)).filter(Number.isFinite)])).sort(
+    (a, b) => b - a
+  );
+
+  const requestedSeason = Number(sp.season ?? currentSeasonYear);
+  const seasonYear = Number.isFinite(requestedSeason) && seasonOptions.includes(requestedSeason) ? requestedSeason : currentSeasonYear;
+
+  const rows = buildSeasonRows(String(league.id), seasonYear);
+
+  const seasonalWinsByUser = new Map<string, number>();
+  for (const y of seasonOptions) {
+    const seasonRowsForWin = buildSeasonRows(String(league.id), y);
+    if (seasonRowsForWin.length === 0) continue;
+    const top = seasonRowsForWin[0]?.total ?? 0;
+    if (top <= 0) continue;
+    for (const r of seasonRowsForWin) {
+      if (r.total !== top) break;
+      seasonalWinsByUser.set(r.user_id, (seasonalWinsByUser.get(r.user_id) ?? 0) + 1);
+    }
+  }
 
   return (
     <main className="app-bg">
@@ -109,11 +151,20 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
           </Link>
         </div>
 
+        <div className="mt-5 flex flex-wrap gap-2">
+          {seasonOptions.map((y) => (
+            <Link key={y} className={`btn ${y === seasonYear ? 'btn-primary' : ''}`} href={`/league/${league.code}/leaderboard?season=${y}`}>
+              {y}
+            </Link>
+          ))}
+        </div>
+
         <div className="mt-8 overflow-hidden card-solid">
           <table className="w-full text-sm">
             <thead className="text-left" style={{ background: 'rgba(16, 19, 24, 0.03)' }}>
             <tr>
               <th className="px-4 py-3">User</th>
+              <th className="px-4 py-3">Season Wins</th>
               <th className="px-4 py-3">Race</th>
               <th className="px-4 py-3">Random</th>
               <th className="px-4 py-3">Total</th>
@@ -125,12 +176,13 @@ export default async function LeaderboardPage({ params }: { params: Promise<{ co
                 <td className="px-4 py-3">
                   <Link
                     className="font-medium underline underline-offset-4"
-                    href={`/league/${league.code}/members/${r.user_id}`}
+                    href={`/league/${league.code}/members/${r.user_id}?season=${seasonYear}`}
                   >
                     {r.nickname}
                   </Link>
                   <div className="mono text-xs muted">{r.role}</div>
                 </td>
+                <td className="px-4 py-3 mono">{seasonalWinsByUser.get(r.user_id) ?? 0}</td>
                 <td className="px-4 py-3 mono">{r.racePts}</td>
                 <td className="px-4 py-3 mono">{r.randomPts}</td>
                 <td className="px-4 py-3 mono font-semibold">{r.total}</td>

@@ -149,6 +149,31 @@ function migrate(db: Database.Database) {
       foreign key (season_year, round) references races(season_year, round) on delete cascade
     );
 
+    create table if not exists kart_tracks (
+      id text primary key,
+      league_id text not null references leagues(id) on delete cascade,
+      name text not null,
+      location text,
+      created_by text not null references users(id) on delete restrict,
+      created_at text not null
+    );
+
+    create table if not exists kart_track_times (
+      id text primary key,
+      track_id text not null references kart_tracks(id) on delete cascade,
+      user_id text not null references users(id) on delete cascade,
+      session_label text,
+      lap_ms integer not null check (lap_ms > 0),
+      session_at text,
+      note text,
+      created_at text not null
+    );
+
+    create index if not exists idx_kart_tracks_league on kart_tracks(league_id);
+    create index if not exists idx_kart_times_track on kart_track_times(track_id, lap_ms asc);
+    create index if not exists idx_kart_times_user on kart_track_times(user_id, created_at desc);
+    create unique index if not exists idx_kart_times_session_best on kart_track_times(track_id, user_id, session_label);
+
     create table if not exists kv (
       k text primary key,
       v text not null
@@ -197,6 +222,15 @@ function migrate(db: Database.Database) {
     if (!cols.has('sprint_p1_driver_id')) db.prepare('alter table race_results add column sprint_p1_driver_id text').run();
     if (!cols.has('sprint_p2_driver_id')) db.prepare('alter table race_results add column sprint_p2_driver_id text').run();
     if (!cols.has('sprint_p3_driver_id')) db.prepare('alter table race_results add column sprint_p3_driver_id text').run();
+  } catch {
+    // ignore
+  }
+
+  try {
+    const cols = new Set(
+      (db.prepare("select name from pragma_table_info('kart_track_times')").all() as any[]).map((r) => String(r.name))
+    );
+    if (!cols.has('session_label')) db.prepare('alter table kart_track_times add column session_label text').run();
   } catch {
     // ignore
   }

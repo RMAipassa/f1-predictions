@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getLeagueByCode } from '@/lib/league';
-import { deleteLeague, leaveLeague } from '@/lib/leagues';
+import { leaveLeague } from '@/lib/leagues';
 
 export default async function LeaguePage({ params }: { params: Promise<{ code: string }> }) {
   const p = await params;
@@ -18,13 +18,6 @@ export default async function LeaguePage({ params }: { params: Promise<{ code: s
     leaveLeague(u.id, String(l.id));
   }
 
-  async function del() {
-    'use server';
-    const { league: l, user: u } = await getLeagueByCode(p.code);
-    if (!l || !u) return;
-    deleteLeague(u.id, String(l.id));
-  }
-
   return (
     <main className="app-bg">
       <div className="shell">
@@ -38,11 +31,6 @@ export default async function LeaguePage({ params }: { params: Promise<{ code: s
           {!isOwner ? (
             <form action={leave}>
               <button className="btn" type="submit">Leave league</button>
-            </form>
-          ) : null}
-          {isOwner ? (
-            <form action={del}>
-              <button className="btn" type="submit">Delete league</button>
             </form>
           ) : null}
           <Link className="btn" href="/leagues">Back</Link>
@@ -64,6 +52,11 @@ export default async function LeaguePage({ params }: { params: Promise<{ code: s
             <div className="mono text-xs muted">Points</div>
             <div className="mt-1 text-lg font-semibold">Leaderboard</div>
             <div className="mt-1 text-sm muted">Race points + manual random points.</div>
+          </Link>
+          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/karting`}>
+            <div className="mono text-xs muted">Karting</div>
+            <div className="mt-1 text-lg font-semibold">Tracks & Personal Bests</div>
+            <div className="mt-1 text-sm muted">Log real-life laps and compare pace.</div>
           </Link>
           {isOwner ? (
             <Link
