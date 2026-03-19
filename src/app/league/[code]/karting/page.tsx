@@ -76,10 +76,10 @@ export default async function LeagueKartingPage({ params }: { params: Promise<{ 
   return (
     <main className="app-bg">
       <div className="shell">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="mono text-xs muted">League Karting</div>
-            <h1 className="text-5xl leading-none h-display">Tracks & Times</h1>
+            <h1 className="text-4xl leading-none h-display md:text-5xl">Tracks & Times</h1>
             <div className="mt-2 text-sm muted">Log session-best laps and compare personal bests per track.</div>
           </div>
           <Link className="btn" href={`/league/${league.code}`}>
@@ -105,8 +105,35 @@ export default async function LeagueKartingPage({ params }: { params: Promise<{ 
           {tracks.length === 0 ? (
             <div className="mt-3 text-sm muted">No tracks yet. Add your first track above.</div>
           ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
+            <>
+              <div className="mt-4 grid gap-3 md:hidden">
+                {tracks.map((t) => (
+                  <div key={`m:${String(t.id)}`} className="card p-4">
+                    <div className="font-medium">{String(t.name)}</div>
+                    <div className="mt-1 text-xs muted">{t.location ? String(t.location) : 'No location'} • By {String(t.created_by)}</div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <div className="mono text-xs muted">League best</div>
+                        <div className="mono">{formatLapMs(t.best_lap_ms)}</div>
+                      </div>
+                      <div>
+                        <div className="mono text-xs muted">Your best</div>
+                        <div className="mono">{formatLapMs(myBestByTrack.get(String(t.id)) ?? null)}</div>
+                      </div>
+                      <div>
+                        <div className="mono text-xs muted">Sessions</div>
+                        <div className="mono">{Number(t.laps_count) || 0}</div>
+                      </div>
+                    </div>
+                    <Link className="btn mt-3" href={`/league/${league.code}/karting/${String(t.id)}`}>
+                      View
+                    </Link>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[760px] text-sm">
                 <thead className="text-left" style={{ background: 'rgba(16, 19, 24, 0.03)' }}>
                   <tr>
                     <th className="px-3 py-2">Track</th>
@@ -136,8 +163,9 @@ export default async function LeagueKartingPage({ params }: { params: Promise<{ 
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+            </>
           )}
         </section>
       </div>

@@ -35,7 +35,7 @@ export default async function KartTrackPage({
   searchParams,
 }: {
   params: Promise<{ code: string; trackId: string }>;
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; session?: string }>;
 }) {
   const p = await params;
   const sp = await searchParams;
@@ -49,6 +49,7 @@ export default async function KartTrackPage({
   if (!track) return notFound();
 
   const rangeRaw = String(sp.range ?? '90');
+  const sessionRaw = String(sp.session ?? '').trim();
   const rangeDays = rangeRaw === '30' ? 30 : rangeRaw === '365' ? 365 : rangeRaw === 'all' ? 0 : 90;
   const cutoffIso =
     rangeDays > 0
@@ -114,6 +115,35 @@ export default async function KartTrackPage({
     .map(([label, value]) => ({ label, at: value.at, entries: value.entries }))
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
     .slice(0, 30);
+
+  const sessionOptionsRows = db()
+    .prepare(
+      `select session_label, max(coalesce(session_at, created_at)) as at_ts
+       from kart_track_times
+       where track_id = ? and session_label is not null and trim(session_label) <> ''
+       group by session_label
+       order by at_ts desc`
+    )
+    .all(String(track.id)) as any[];
+  const sessionOptions = sessionOptionsRows.map((r) => String(r.session_label));
+  const selectedSessionLabel =
+    sessionRaw && sessionOptions.includes(sessionRaw)
+      ? sessionRaw
+      : sessionOptions.length > 0
+      ? sessionOptions[0]
+      : '';
+
+  const selectedSessionEntries = selectedSessionLabel
+    ? (db()
+        .prepare(
+          `select ktt.user_id, u.nickname, ktt.lap_ms, ktt.note, coalesce(ktt.session_at, ktt.created_at) as at_ts
+           from kart_track_times ktt
+           join users u on u.id = ktt.user_id
+           where ktt.track_id = ? and ktt.session_label = ?
+           order by ktt.lap_ms asc, u.nickname asc`
+        )
+        .all(String(track.id), selectedSessionLabel) as any[])
+    : [];
 
   const trendRows = cutoffIso
     ? (db()
@@ -267,13 +297,13 @@ export default async function KartTrackPage({
   return (
     <main className="app-bg">
       <div className="shell">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="mono text-xs muted">Karting Track</div>
-            <h1 className="text-5xl leading-none h-display">{String(track.name)}</h1>
+            <h1 className="text-4xl leading-none h-display md:text-5xl">{String(track.name)}</h1>
             <div className="mt-2 text-sm muted">{track.location ? String(track.location) : 'Location not set'}</div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link className="btn" href={`/league/${league.code}/leaderboard`}>
               League points
             </Link>
@@ -299,7 +329,21 @@ export default async function KartTrackPage({
           <div className="card-solid p-5">
             <div className="text-lg font-semibold">Add your session best</div>
             <form action={addLapTime} className="mt-3 grid gap-3">
-              <input className="field" type="text" name="session_label" placeholder="Session label (e.g. 2026-03-19 Evening)" required maxLength={80} />
+              <input
+                className="field"
+                type="text"
+                name="session_label"
+                placeholder="Session label (e.g. 2026-03-19 Evening)"
+                required
+                maxLength={80}
+                list="session-labels"
+                defaultValue={selectedSessionLabel}
+              />
+              <datalist id="session-labels">
+                {sessionOptions.map((s) => (
+                  <option key={`opt:${s}`} value={s} />
+                ))}
+              </datalist>
               <input className="field" type="text" name="best_time" placeholder="Best lap (e.g. 1:02.345 or 62.345)" required />
               <input className="field" type="datetime-local" name="session_at" />
               <input className="field" type="text" name="note" maxLength={140} placeholder="Notes (kart class, weather, etc.)" />
@@ -318,7 +362,7 @@ export default async function KartTrackPage({
             <div className="mt-3 text-sm muted">No lap times yet.</div>
           ) : (
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[620px] text-sm">
                 <thead className="text-left" style={{ background: 'rgba(16, 19, 24, 0.03)' }}>
                   <tr>
                     <th className="px-3 py-2">Pos</th>
@@ -345,9 +389,59 @@ export default async function KartTrackPage({
         </section>
 
         <section className="mt-6 card-solid p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="text-lg font-semibold">Session leaderboard</div>
+            <div className="mono text-xs muted">{selectedSessionLabel || 'No session selected'}</div>
+          </div>
+
+          {sessionOptions.length > 0 ? (
+            <form method="get" action={`/league/${league.code}/karting/${track.id}`} className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+              <input type="hidden" name="range" value={rangeRaw} />
+              <select className="field" name="session" defaultValue={selectedSessionLabel}>
+                {sessionOptions.map((s) => (
+                  <option key={`pick:${s}`} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <button className="btn" type="submit">Open session</button>
+            </form>
+          ) : null}
+
+          {selectedSessionEntries.length === 0 ? (
+            <div className="mt-3 text-sm muted">No entries for this session yet.</div>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[680px] text-sm">
+                <thead className="text-left" style={{ background: 'rgba(16, 19, 24, 0.03)' }}>
+                  <tr>
+                    <th className="px-3 py-2">Pos</th>
+                    <th className="px-3 py-2">Driver</th>
+                    <th className="px-3 py-2">Best</th>
+                    <th className="px-3 py-2">Note</th>
+                    <th className="px-3 py-2">Session time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedSessionEntries.map((e, i) => (
+                    <tr key={`session:${selectedSessionLabel}:${e.user_id}`} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                      <td className="px-3 py-2 mono">{i + 1}</td>
+                      <td className="px-3 py-2 font-medium">{String(e.nickname)}</td>
+                      <td className="px-3 py-2 mono">{formatLapMs(e.lap_ms)}</td>
+                      <td className="px-3 py-2">{e.note ? String(e.note) : '—'}</td>
+                      <td className="px-3 py-2 mono">{e.at_ts ? new Date(String(e.at_ts)).toLocaleString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="mt-6 card-solid p-5">
           <div className="flex items-center justify-between gap-3">
             <div className="text-lg font-semibold">Time trend</div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {[
                 { key: '30', label: '30d' },
                 { key: '90', label: '90d' },
@@ -357,7 +451,7 @@ export default async function KartTrackPage({
                 <Link
                   key={r.key}
                   className={`btn ${rangeRaw === r.key ? 'btn-primary' : ''}`}
-                  href={`/league/${league.code}/karting/${track.id}?range=${r.key}`}
+                  href={`/league/${league.code}/karting/${track.id}?range=${r.key}${selectedSessionLabel ? `&session=${encodeURIComponent(selectedSessionLabel)}` : ''}`}
                 >
                   {r.label}
                 </Link>
@@ -408,12 +502,17 @@ export default async function KartTrackPage({
             <div className="mt-4 grid gap-3">
               {sessionGroups.map((s) => (
                 <div key={`${s.label}:${s.at}`} className="card p-4">
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="font-semibold">{s.label}</div>
                       <div className="mt-1 mono text-xs muted">{new Date(s.at).toLocaleString()}</div>
                     </div>
-                    <div className="mono text-xs muted">{s.entries.length} entries</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="mono text-xs muted">{s.entries.length} entries</div>
+                      <Link className="btn" href={`/league/${league.code}/karting/${track.id}?range=${rangeRaw}&session=${encodeURIComponent(s.label)}`}>
+                        Use this session
+                      </Link>
+                    </div>
                   </div>
                   <div className="mt-3 grid gap-1 text-sm">
                     {s.entries
@@ -442,7 +541,7 @@ export default async function KartTrackPage({
             <div className="mt-3 text-sm muted">No entries yet.</div>
           ) : (
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[860px] text-sm">
                 <thead className="text-left" style={{ background: 'rgba(16, 19, 24, 0.03)' }}>
                   <tr>
                     <th className="px-3 py-2">Driver</th>
