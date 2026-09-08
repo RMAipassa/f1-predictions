@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentUser, requestPasswordReset } from '@/lib/auth';
-import { isSmtpConfigured, sendPasswordResetEmail } from '@/lib/mail';
+import { isSmtpConfigured, passwordResetUrl, sendPasswordResetEmail } from '@/lib/mail';
 
 export default async function ForgotPasswordPage({
   searchParams,
@@ -15,6 +15,7 @@ export default async function ForgotPasswordPage({
   const done = sp.ok === '1';
   const token = String(sp.token ?? '');
   const emailed = sp.emailed === '1';
+  const resetLink = token ? passwordResetUrl(token) : '';
 
   async function action(formData: FormData) {
     'use server';
@@ -58,7 +59,7 @@ export default async function ForgotPasswordPage({
             ) : token ? (
               <div className="mt-2">
                 Use this one-time link:
-                <div className="mt-1 break-all mono">/reset-password?token={token}</div>
+                <div className="mt-1 break-all mono">{resetLink}</div>
               </div>
             ) : (
               <div className="mt-2 muted">No on-screen token available.</div>

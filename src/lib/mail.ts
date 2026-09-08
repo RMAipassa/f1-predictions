@@ -36,6 +36,22 @@ function appBaseUrl() {
   return 'http://localhost:3210';
 }
 
+function normalizeFromAddress(raw: string) {
+  const value = raw.trim();
+  if (!value || value.includes('<')) return value;
+
+  const parts = value.split(/\s+/);
+  const address = parts.at(-1) ?? '';
+  const name = parts.slice(0, -1).join(' ').trim();
+  if (name && /^\S+@\S+\.\S+$/.test(address)) return { name, address };
+
+  return value;
+}
+
+export function passwordResetUrl(token: string) {
+  return `${appBaseUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+}
+
 export function isSmtpConfigured() {
   return Boolean(loadSmtpConfig());
 }
@@ -54,10 +70,10 @@ export async function sendPasswordResetEmail(toEmail: string, token: string) {
     },
   });
 
-  const link = `${appBaseUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+  const link = passwordResetUrl(token);
 
   await transporter.sendMail({
-    from: cfg.from,
+    from: normalizeFromAddress(cfg.from),
     to: toEmail,
     subject: 'F1 Predictions - Password reset',
     text: `Use this link to reset your password (valid for 30 minutes):\n\n${link}\n\nIf you did not request this, you can ignore this email.`,

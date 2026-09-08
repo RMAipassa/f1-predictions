@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createAdminPasswordResetToken, getCurrentUser } from '@/lib/auth';
 import { getKv, setKv } from '@/lib/kv';
+import { passwordResetUrl } from '@/lib/mail';
 
 export default async function SettingsPage({
   searchParams,
@@ -124,7 +125,7 @@ export default async function SettingsPage({
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <input className="field" name="smtp_user" defaultValue={smtpUser} placeholder="SMTP user" />
-                  <input className="field" name="smtp_from" defaultValue={smtpFrom} placeholder="From email" />
+                  <input className="field" name="smtp_from" defaultValue={smtpFrom} placeholder="F1 Predictions dartsruby@gmail.com" />
                 </div>
                 <div className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
                   <label className="flex items-center gap-2 text-sm">
@@ -137,6 +138,10 @@ export default async function SettingsPage({
                   Save SMTP
                 </button>
               </form>
+
+              <div className="mt-2 text-xs muted">
+                Sender accepts an email, <span className="mono">Name &lt;email&gt;</span>, or <span className="mono">Name email</span>.
+              </div>
 
               {sp.smtp === 'ok' ? <div className="mt-2 text-sm">SMTP settings saved.</div> : null}
             </div>
@@ -157,7 +162,7 @@ export default async function SettingsPage({
                   {sp.recovery === 'ok' ? (
                     <>
                       <div className="font-semibold">Recovery token for {sp.target}</div>
-                      <div className="mt-1 mono break-all">/reset-password?token={sp.token}</div>
+                      <div className="mt-1 mono break-all">{passwordResetUrl(String(sp.token ?? ''))}</div>
                     </>
                   ) : sp.recovery === 'not_found' ? (
                     'No matching user found.'
