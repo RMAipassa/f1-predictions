@@ -6,7 +6,7 @@ import { isSmtpConfigured, passwordResetUrl, sendPasswordResetEmail } from '@/li
 export default async function ForgotPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ok?: string; token?: string; emailed?: string }>;
+  searchParams: Promise<{ ok?: string; token?: string; emailed?: string; emailError?: string }>;
 }) {
   const user = await getCurrentUser();
   if (user) redirect('/leagues');
@@ -15,23 +15,27 @@ export default async function ForgotPasswordPage({
   const done = sp.ok === '1';
   const token = String(sp.token ?? '');
   const emailed = sp.emailed === '1';
+  const emailError = sp.emailError === '1';
   const resetLink = token ? passwordResetUrl(token) : '';
 
   async function action(formData: FormData) {
     'use server';
     const nickname = String(formData.get('nickname') ?? '');
     const res = await requestPasswordReset(nickname);
-    let emailedFlag = '';
-    if (res.token && res.email && isSmtpConfigured()) {
-      try {
-        const mail = await sendPasswordResetEmail(res.email, res.token);
-        if (mail.ok) emailedFlag = '&emailed=1';
-      } catch {
-        // fallback remains on-page token
+    if (res.token && res.email) {
+      if (isSmtpConfigured()) {
+        try {
+          const mail = await sendPasswordResetEmail(res.email, res.token);
+          if (mail.ok) redirect('/forgot-password?ok=1&emailed=1');
+        } catch {
+          // Show a delivery error without exposing the reset token.
+        }
       }
+      redirect('/forgot-password?ok=1&emailError=1');
     }
-    const tokenParam = res.token && !emailedFlag ? `&token=${encodeURIComponent(res.token)}` : '';
-    redirect(`/forgot-password?ok=1${emailedFlag}${tokenParam}`);
+
+    const tokenParam = res.token ? `&token=${encodeURIComponent(res.token)}` : '';
+    redirect(`/forgot-password?ok=1${tokenParam}`);
   }
 
   return (
@@ -56,10 +60,14 @@ export default async function ForgotPasswordPage({
             <div className="mt-1 muted">If the account exists, recovery instructions are ready.</div>
             {emailed ? (
               <div className="mt-2">Reset link sent by email.</div>
+            ) : emailError ? (
+              <div className="mt-2 text-red-700">The reset email could not be sent. Contact the app administrator.</div>
             ) : token ? (
               <div className="mt-2">
                 Use this one-time link:
-                <div className="mt-1 break-all mono">{resetLink}</div>
+                <a className="mt-1 block break-all mono underline underline-offset-4" href={resetLink}>
+                  {resetLink}
+                </a>
               </div>
             ) : (
               <div className="mt-2 muted">No on-screen token available.</div>
