@@ -57,6 +57,12 @@ export default async function LoginPage({
           </Link>
         </div>
 
+        <div className="mt-2 text-sm">
+          <Link className="underline underline-offset-4" href="/forgot-password">
+            Forgot password?
+          </Link>
+        </div>
+
         {sp.error ? <p className="mt-4 text-sm text-red-700">Invalid login.</p> : null}
       </div>
     </main>

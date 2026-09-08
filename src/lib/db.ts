@@ -12,15 +12,28 @@ function migrate(db: Database.Database) {
     create table if not exists users (
       id text primary key,
       nickname text not null unique,
+      email text,
       password_hash text not null,
       created_at text not null
     );
+
+    create unique index if not exists idx_users_email_unique on users(email) where email is not null and trim(email) <> '';
 
     create table if not exists sessions (
       token text primary key,
       user_id text not null references users(id) on delete cascade,
       expires_at text not null
     );
+
+    create table if not exists password_reset_tokens (
+      token text primary key,
+      user_id text not null references users(id) on delete cascade,
+      expires_at text not null,
+      created_at text not null,
+      used_at text
+    );
+
+    create index if not exists idx_password_reset_user on password_reset_tokens(user_id, created_at desc);
 
     create table if not exists leagues (
       id text primary key,
@@ -181,6 +194,16 @@ function migrate(db: Database.Database) {
   `);
 
   // Lightweight column migrations for existing db.sqlite.
+  try {
+    const cols = new Set(
+      (db.prepare("select name from pragma_table_info('users')").all() as any[]).map((r) => String(r.name))
+    );
+    if (!cols.has('email')) db.prepare('alter table users add column email text').run();
+    db.exec("create unique index if not exists idx_users_email_unique on users(email) where email is not null and trim(email) <> '';");
+  } catch {
+    // ignore
+  }
+
   try {
     const cols = new Set(
       (db.prepare("select name from pragma_table_info('races')").all() as any[]).map((r) => String(r.name))

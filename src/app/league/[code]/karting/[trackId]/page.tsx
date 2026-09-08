@@ -30,6 +30,18 @@ function parseLapTimeToMs(raw: string) {
   return Math.round(sec * 1000);
 }
 
+function toDateTimeLocalValue(raw: unknown) {
+  if (!raw) return '';
+  const d = new Date(String(raw));
+  if (!Number.isFinite(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${day}T${hh}:${mm}`;
+}
+
 export default async function KartTrackPage({
   params,
   searchParams,
@@ -290,6 +302,60 @@ export default async function KartTrackPage({
            and track_id in (select id from kart_tracks where id = ? and league_id = ?)`
       )
       .run(entryId, freshUser.id, String(p.trackId), String(freshLeague.id));
+
+    redirect(`/league/${p.code}/karting/${p.trackId}`);
+  }
+
+  async function editEntry(formData: FormData) {
+    'use server';
+
+    const { league: freshLeague, user: freshUser } = await getLeagueByCode(p.code);
+    if (!freshLeague || !freshUser) return;
+
+    const entryId = String(formData.get('entry_id') ?? '');
+    const lapRaw = String(formData.get('best_time') ?? '');
+    const sessionLabel = String(formData.get('session_label') ?? '').trim();
+    const note = String(formData.get('note') ?? '').trim();
+    const sessionAtRaw = String(formData.get('session_at') ?? '').trim();
+
+    const lapMs = parseLapTimeToMs(lapRaw);
+    if (!entryId || !lapMs || lapMs < 10000 || lapMs > 600000) return;
+    if (sessionLabel.length < 2 || sessionLabel.length > 80) return;
+    if (note.length > 140) return;
+
+    const sessionAt = sessionAtRaw ? new Date(sessionAtRaw).toISOString() : null;
+
+    const current = db()
+      .prepare(
+        `select id, track_id, user_id
+         from kart_track_times
+         where id = ? and user_id = ? and track_id in (select id from kart_tracks where id = ? and league_id = ?)`
+      )
+      .get(entryId, freshUser.id, String(p.trackId), String(freshLeague.id)) as any;
+    if (!current?.id) return;
+
+    const conflict = db()
+      .prepare(
+        `select id, lap_ms, session_at, note
+         from kart_track_times
+         where track_id = ? and user_id = ? and session_label = ? and id <> ?`
+      )
+      .get(String(p.trackId), freshUser.id, sessionLabel, entryId) as any;
+
+    const tx = db().transaction(() => {
+      if (conflict?.id) {
+        const mergedMs = Math.min(Number(conflict.lap_ms) || lapMs, lapMs);
+        db()
+          .prepare('update kart_track_times set lap_ms = ?, session_at = ?, note = ?, created_at = ? where id = ?')
+          .run(mergedMs, sessionAt, note || null, new Date().toISOString(), String(conflict.id));
+        db().prepare('delete from kart_track_times where id = ?').run(entryId);
+      } else {
+        db()
+          .prepare('update kart_track_times set session_label = ?, lap_ms = ?, session_at = ?, note = ?, created_at = ? where id = ?')
+          .run(sessionLabel, lapMs, sessionAt, note || null, new Date().toISOString(), entryId);
+      }
+    });
+    tx();
 
     redirect(`/league/${p.code}/karting/${p.trackId}`);
   }
@@ -566,10 +632,23 @@ export default async function KartTrackPage({
                         <td className="px-3 py-2 mono">{new Date(String(e.created_at)).toLocaleString()}</td>
                         <td className="px-3 py-2">
                           {mine ? (
-                            <form action={removeEntry}>
-                              <input type="hidden" name="entry_id" value={String(e.id)} />
-                              <button className="btn" type="submit">Remove</button>
-                            </form>
+                            <div className="flex flex-wrap gap-2">
+                              <details>
+                                <summary className="btn cursor-pointer list-none">Edit</summary>
+                                <form action={editEntry} className="mt-2 grid min-w-[260px] gap-2 card p-3">
+                                  <input type="hidden" name="entry_id" value={String(e.id)} />
+                                  <input className="field" name="session_label" defaultValue={String(e.session_label || '')} required maxLength={80} />
+                                  <input className="field" name="best_time" defaultValue={formatLapMs(e.lap_ms)} required />
+                                  <input className="field" type="datetime-local" name="session_at" defaultValue={toDateTimeLocalValue(e.session_at)} />
+                                  <input className="field" name="note" defaultValue={String(e.note || '')} maxLength={140} />
+                                  <button className="btn" type="submit">Save</button>
+                                </form>
+                              </details>
+                              <form action={removeEntry}>
+                                <input type="hidden" name="entry_id" value={String(e.id)} />
+                                <button className="btn" type="submit">Remove</button>
+                              </form>
+                            </div>
                           ) : (
                             <span className="mono text-xs muted">—</span>
                           )}

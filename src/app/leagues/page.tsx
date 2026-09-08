@@ -72,6 +72,9 @@ export default async function LeaguesPage() {
             <Link className="btn btn-primary" href="/leagues/new">
               New league
             </Link>
+            <Link className="btn" href="/account">
+              Account
+            </Link>
             <Link className="btn" href="/settings">
               Settings
             </Link>
