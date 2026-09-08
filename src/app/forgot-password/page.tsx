@@ -23,14 +23,16 @@ export default async function ForgotPasswordPage({
     const nickname = String(formData.get('nickname') ?? '');
     const res = await requestPasswordReset(nickname);
     if (res.token && res.email) {
+      let sent = false;
       if (isSmtpConfigured()) {
         try {
           const mail = await sendPasswordResetEmail(res.email, res.token);
-          if (mail.ok) redirect('/forgot-password?ok=1&emailed=1');
+          sent = mail.ok;
         } catch {
           // Show a delivery error without exposing the reset token.
         }
       }
+      if (sent) redirect('/forgot-password?ok=1&emailed=1');
       redirect('/forgot-password?ok=1&emailError=1');
     }
 
