@@ -46,7 +46,7 @@ export default function ThemeToggle() {
       aria-label="Toggle theme"
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      <span className="mono text-xs">{next.toUpperCase()} MODE</span>
+      <span className="mono text-xs">{theme === 'dark' ? 'RED BULL / DARK' : 'FERRARI / LIGHT'}</span>
     </button>
   );
 }

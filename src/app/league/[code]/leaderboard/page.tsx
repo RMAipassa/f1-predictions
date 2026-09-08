@@ -126,6 +126,25 @@ export default async function LeaderboardPage({
 
   const seasonalWinsByUser = new Map<string, number>();
   for (const y of seasonOptions) {
+    const finalRound = db()
+      .prepare(
+        `select r.race_start, rr.p1_driver_id, rr.p2_driver_id, rr.p3_driver_id
+         from races r
+         left join race_results rr on rr.season_year = r.season_year and rr.round = r.round
+         where r.season_year = ?
+         order by r.round desc
+         limit 1`
+      )
+      .get(y) as any;
+
+    const finalRoundStarted = finalRound?.race_start
+      ? new Date(String(finalRound.race_start)).getTime() <= Date.now()
+      : false;
+    const finalRoundCertified = Boolean(
+      finalRound?.p1_driver_id && finalRound?.p2_driver_id && finalRound?.p3_driver_id
+    );
+    if (!finalRoundStarted || !finalRoundCertified) continue;
+
     const seasonRowsForWin = buildSeasonRows(String(league.id), y);
     if (seasonRowsForWin.length === 0) continue;
     const top = seasonRowsForWin[0]?.total ?? 0;

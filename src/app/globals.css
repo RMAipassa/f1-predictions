@@ -2,17 +2,20 @@
 
 :root {
   color-scheme: light;
-  --background: #eeece5;
-  --foreground: #11120f;
-  --card: #f7f6f1;
-  --card-solid: #fbfaf6;
-  --surface: #e5e2d9;
+  --background: #f2efe7;
+  --foreground: #171310;
+  --card: #f8f5ed;
+  --card-solid: #fffdf7;
+  --surface: #e8e3d8;
   --surface-strong: #ffffff;
-  --border: #bbb8ae;
-  --border-strong: #22231f;
-  --muted: #68685f;
-  --accent: #d82920;
-  --accent-2: #2254d1;
+  --border: #c8beb2;
+  --border-strong: #29221d;
+  --muted: #71665f;
+  --accent: #e80020;
+  --accent-ink: #ffffff;
+  --accent-2: #0067b1;
+  --brand-panel: #c9001c;
+  --brand-panel-text: #ffffff;
   --shadow: none;
   --shadow-soft: none;
   --radius: 3px;
@@ -20,17 +23,20 @@
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  --background: #0d0e0c;
-  --foreground: #f2f0e8;
-  --card: #151613;
-  --card-solid: #191a17;
-  --surface: #242520;
-  --surface-strong: #2b2c27;
-  --border: #3e4038;
-  --border-strong: #d8d6cd;
-  --muted: #9c9c91;
-  --accent: #ff4035;
-  --accent-2: #7696ff;
+  --background: #061128;
+  --foreground: #f3f5fb;
+  --card: #0b1937;
+  --card-solid: #0e1d40;
+  --surface: #17284e;
+  --surface-strong: #20345f;
+  --border: #31446d;
+  --border-strong: #dce4f6;
+  --muted: #9cacca;
+  --accent: #ffec00;
+  --accent-ink: #071329;
+  --accent-2: #e10600;
+  --brand-panel: #071a40;
+  --brand-panel-text: #ffffff;
 }
 
 @theme inline {
@@ -50,7 +56,7 @@ body {
 
 @layer base {
   ::selection {
-    color: #fff;
+    color: var(--accent-ink);
     background: var(--accent);
   }
 
@@ -140,15 +146,15 @@ body {
   }
 
   .btn-primary {
-    color: #fff;
+    color: var(--accent-ink);
     border-color: var(--accent);
     background: var(--accent);
   }
 
   .btn-primary:hover {
-    color: #fff;
+    color: var(--accent-ink);
     border-color: color-mix(in srgb, var(--accent) 75%, #000);
-    background: color-mix(in srgb, var(--accent) 82%, #000);
+    background: color-mix(in srgb, var(--accent) 86%, var(--foreground));
   }
 
   .btn-dark {
@@ -270,8 +276,8 @@ body {
     justify-content: space-between;
     padding: 2rem;
     overflow: hidden;
-    color: #fff;
-    background: #171815;
+    color: var(--brand-panel-text);
+    background: var(--brand-panel);
   }
 
   .auth-brand::after {
