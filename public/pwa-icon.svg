@@ -1,35 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="F1 Predictions">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0b0f14"/>
-      <stop offset="1" stop-color="#141a24"/>
-    </linearGradient>
-    <linearGradient id="r" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#d61f2c"/>
-      <stop offset="1" stop-color="#ff3b30"/>
-    </linearGradient>
-  </defs>
-
-  <rect width="512" height="512" rx="112" fill="url(#g)"/>
-
-  <!-- Track stripe -->
-  <path d="M96 330c64-86 130-126 198-126 44 0 86 14 126 42 18 12 37 28 56 48v56c-20-24-41-43-63-58-37-25-74-37-111-37-56 0-112 32-166 96H96z" fill="url(#r)"/>
-
-  <!-- Checkers -->
-  <g transform="translate(318 124) rotate(10)">
-    <rect x="0" y="0" width="120" height="120" rx="18" fill="#0f1420" opacity="0.9"/>
-    <g fill="#f7f5f0" opacity="0.9">
-      <rect x="18" y="18" width="24" height="24"/>
-      <rect x="66" y="18" width="24" height="24"/>
-      <rect x="42" y="42" width="24" height="24"/>
-      <rect x="18" y="66" width="24" height="24"/>
-      <rect x="66" y="66" width="24" height="24"/>
-    </g>
-  </g>
-
-  <!-- Monogram -->
-  <g fill="#f7f5f0" opacity="0.95">
-    <path d="M108 170h196c14 0 22 15 14 27l-18 27h-89l-18 28h89l-18 27H128c-14 0-22-15-14-27l18-27h55l18-28h-55l18-27z"/>
-    <path d="M342 170h62c10 0 18 8 18 18v24c0 10-8 18-18 18h-36l-18 28h54v36h-98l54-84h-36v-40z"/>
-  </g>
+  <rect width="512" height="512" fill="#11120f"/>
+  <path fill="#d82920" d="M52 52h28v408H52zM80 404h380v56H80z"/>
+  <path fill="#f2f0e8" d="M126 136h144v48h-88v54h72v46h-72v102h-56V136zm174 0h96c43 0 70 27 70 72 0 46-27 75-70 75h-40v103h-56V136zm56 48v52h31c15 0 23-8 23-26 0-17-8-26-23-26h-31z"/>
+  <path fill="#f2f0e8" d="M112 84h36v12h-36zm54 0h72v12h-72zm90 0h18v12h-18zm36 0h108v12H292z" opacity=".55"/>
 </svg>

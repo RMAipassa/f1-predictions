@@ -92,71 +92,31 @@ function generateIcon(size) {
   const h = size;
   const rgba = Buffer.alloc(w * h * 4);
 
-  // Background
-  fillRect(rgba, w, 0, 0, w, h, 11, 15, 20, 255);
+  const n = (value) => Math.max(1, Math.round(size * value));
+  const ink = [242, 240, 232, 255];
+  const red = [216, 41, 32, 255];
 
-  // Red track stripe
-  const stripeH = Math.max(10, Math.floor(size * 0.14));
-  for (let y = 0; y < h; y++) {
-    const t = y / (h - 1);
-    const xCenter = Math.floor(w * (0.20 + t * 0.65));
-    const x0 = xCenter - Math.floor(stripeH * 1.6);
-    const x1 = xCenter + Math.floor(stripeH * 1.6);
-    for (let x = x0; x <= x1; x++) {
-      if (x < 0 || x >= w) continue;
-      const yy = y;
-      const i = (yy * w + x) * 4;
-      rgba[i + 0] = 214;
-      rgba[i + 1] = 31;
-      rgba[i + 2] = 44;
-      rgba[i + 3] = 255;
-    }
-  }
+  // Timing-board base and red datum lines.
+  fillRect(rgba, w, 0, 0, w, h, 17, 18, 15, 255);
+  fillRect(rgba, w, n(0.102), n(0.102), n(0.055), n(0.796), ...red);
+  fillRect(rgba, w, n(0.157), n(0.789), n(0.741), n(0.109), ...red);
 
-  // Checkers block
-  const bx = Math.floor(size * 0.62);
-  const by = Math.floor(size * 0.18);
-  const bw = Math.floor(size * 0.26);
-  const cell = Math.max(6, Math.floor(bw / 5));
-  fillRect(rgba, w, bx, by, bw, bw, 15, 20, 32, 235);
-  for (let cy = 0; cy < 5; cy++) {
-    for (let cx = 0; cx < 5; cx++) {
-      if ((cx + cy) % 2 === 0) {
-        fillRect(
-          rgba,
-          w,
-          bx + cx * cell + Math.floor(cell * 0.2),
-          by + cy * cell + Math.floor(cell * 0.2),
-          Math.floor(cell * 0.75),
-          Math.floor(cell * 0.75),
-          247,
-          245,
-          240,
-          235
-        );
-      }
-    }
-  }
+  // F monogram.
+  fillRect(rgba, w, n(0.246), n(0.266), n(0.109), n(0.488), ...ink);
+  fillRect(rgba, w, n(0.246), n(0.266), n(0.281), n(0.094), ...ink);
+  fillRect(rgba, w, n(0.246), n(0.465), n(0.250), n(0.090), ...ink);
 
-  // Simple "F1" glyph bars
-  const gx = Math.floor(size * 0.16);
-  const gy = Math.floor(size * 0.26);
-  const gh = Math.floor(size * 0.18);
-  const gw = Math.floor(size * 0.54);
-  fillRect(rgba, w, gx, gy, gw, Math.floor(gh * 0.30), 247, 245, 240, 240);
-  fillRect(rgba, w, gx, gy, Math.floor(gw * 0.12), gh, 247, 245, 240, 240);
-  fillRect(
-    rgba,
-    w,
-    gx + Math.floor(gw * 0.22),
-    gy + Math.floor(gh * 0.55),
-    Math.floor(gw * 0.78),
-    Math.floor(gh * 0.30),
-    247,
-    245,
-    240,
-    240
-  );
+  // P monogram.
+  fillRect(rgba, w, n(0.586), n(0.266), n(0.109), n(0.488), ...ink);
+  fillRect(rgba, w, n(0.586), n(0.266), n(0.188), n(0.094), ...ink);
+  fillRect(rgba, w, n(0.586), n(0.461), n(0.188), n(0.092), ...ink);
+  fillRect(rgba, w, n(0.773), n(0.266), n(0.109), n(0.287), ...ink);
+
+  // Small timing ticks.
+  fillRect(rgba, w, n(0.219), n(0.164), n(0.070), n(0.023), 242, 240, 232, 140);
+  fillRect(rgba, w, n(0.324), n(0.164), n(0.141), n(0.023), 242, 240, 232, 140);
+  fillRect(rgba, w, n(0.500), n(0.164), n(0.035), n(0.023), 242, 240, 232, 140);
+  fillRect(rgba, w, n(0.570), n(0.164), n(0.211), n(0.023), 242, 240, 232, 140);
 
   return pngRGBA(w, h, rgba);
 }
