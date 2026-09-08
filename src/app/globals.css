@@ -32,9 +32,9 @@ html[data-theme="dark"] {
   --border: #31446d;
   --border-strong: #dce4f6;
   --muted: #9cacca;
-  --accent: #ffec00;
-  --accent-ink: #071329;
-  --accent-2: #e10600;
+  --accent: #e10600;
+  --accent-ink: #ffffff;
+  --accent-2: #3671c6;
   --brand-panel: #071a40;
   --brand-panel-text: #ffffff;
 }
