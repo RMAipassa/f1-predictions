@@ -17,8 +17,6 @@ function migrate(db: Database.Database) {
       created_at text not null
     );
 
-    create unique index if not exists idx_users_email_unique on users(email) where email is not null and trim(email) <> '';
-
     create table if not exists sessions (
       token text primary key,
       user_id text not null references users(id) on delete cascade,
@@ -185,8 +183,6 @@ function migrate(db: Database.Database) {
     create index if not exists idx_kart_tracks_league on kart_tracks(league_id);
     create index if not exists idx_kart_times_track on kart_track_times(track_id, lap_ms asc);
     create index if not exists idx_kart_times_user on kart_track_times(user_id, created_at desc);
-    create unique index if not exists idx_kart_times_session_best on kart_track_times(track_id, user_id, session_label);
-
     create table if not exists kv (
       k text primary key,
       v text not null
@@ -254,6 +250,7 @@ function migrate(db: Database.Database) {
       (db.prepare("select name from pragma_table_info('kart_track_times')").all() as any[]).map((r) => String(r.name))
     );
     if (!cols.has('session_label')) db.prepare('alter table kart_track_times add column session_label text').run();
+    db.exec('create unique index if not exists idx_kart_times_session_best on kart_track_times(track_id, user_id, session_label);');
   } catch {
     // ignore
   }
