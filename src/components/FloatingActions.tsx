@@ -5,7 +5,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 
 export default function FloatingActions() {
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+    <div className="fixed bottom-3 right-3 z-50 flex items-center gap-1 border border-[var(--border)] bg-[var(--card-solid)] p-1 sm:bottom-5 sm:right-5">
       <InstallApp />
       <ThemeToggle />
     </div>

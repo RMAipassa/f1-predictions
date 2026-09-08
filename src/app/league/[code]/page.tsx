@@ -21,51 +21,55 @@ export default async function LeaguePage({ params }: { params: Promise<{ code: s
   return (
     <main className="app-bg">
       <div className="shell">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="mono text-xs muted">League</div>
-          <h1 className="text-5xl leading-none h-display">{league.name}</h1>
-          <div className="mt-2 text-sm muted">Invite code: <span className="mono">{league.code}</span></div>
+        <div className="page-header">
+          <div>
+            <div className="eyebrow">League Control</div>
+            <h1 className="mt-3 text-6xl leading-[0.88] h-display md:text-8xl">{league.name}</h1>
+            <div className="mt-4 flex items-center gap-3 text-sm muted">
+              <span>Invite code</span>
+              <span className="border border-[var(--border)] bg-[var(--surface)] px-2 py-1 mono text-xs tracking-widest">{league.code}</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!isOwner ? (
+              <form action={leave}>
+                <button className="btn" type="submit">Leave league</button>
+              </form>
+            ) : null}
+            <Link className="btn" href="/leagues">All leagues</Link>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {!isOwner ? (
-            <form action={leave}>
-              <button className="btn" type="submit">Leave league</button>
-            </form>
-          ) : null}
-          <Link className="btn" href="/leagues">Back</Link>
-        </div>
-      </div>
 
-        <div className="mt-8 grid gap-3 md:grid-cols-2">
-          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/season`}>
-            <div className="mono text-xs muted">Season</div>
-            <div className="mt-1 text-lg font-semibold">WDC / WCC + Random</div>
-            <div className="mt-1 text-sm muted">Locks at start of Race 1.</div>
+        <div className="feature-grid mt-10 wipe-in">
+          <Link className="feature-card" data-index="01" href={`/league/${league.code}/season`}>
+            <div className="eyebrow">Season</div>
+            <div className="feature-card-title mt-5">WDC / WCC + Random</div>
+            <div className="mt-3 max-w-xs text-sm muted">Set the long game before the first lights go out.</div>
           </Link>
-          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/races`}>
-            <div className="mono text-xs muted">Race</div>
-            <div className="mt-1 text-lg font-semibold">Pole + Podium</div>
-            <div className="mt-1 text-sm muted">Auto-certified from results.</div>
+          <Link className="feature-card" data-index="02" href={`/league/${league.code}/races`}>
+            <div className="eyebrow">Race Weekends</div>
+            <div className="feature-card-title mt-5">Pole, Sprint & Podium</div>
+            <div className="mt-3 max-w-xs text-sm muted">Make picks session by session. Results certify automatically.</div>
           </Link>
-          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/leaderboard`}>
-            <div className="mono text-xs muted">Points</div>
-            <div className="mt-1 text-lg font-semibold">Leaderboard</div>
-            <div className="mt-1 text-sm muted">Race points + manual random points.</div>
+          <Link className="feature-card" data-index="03" href={`/league/${league.code}/leaderboard`}>
+            <div className="eyebrow">Standings</div>
+            <div className="feature-card-title mt-5">League Leaderboard</div>
+            <div className="mt-3 max-w-xs text-sm muted">Current scores, season history and championship wins.</div>
           </Link>
-          <Link className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]" href={`/league/${league.code}/karting`}>
-            <div className="mono text-xs muted">Karting</div>
-            <div className="mt-1 text-lg font-semibold">Tracks & Personal Bests</div>
-            <div className="mt-1 text-sm muted">Log real-life laps and compare pace.</div>
+          <Link className="feature-card" data-index="04" href={`/league/${league.code}/karting`}>
+            <div className="eyebrow">Real Track</div>
+            <div className="feature-card-title mt-5">Karting Sessions</div>
+            <div className="mt-3 max-w-xs text-sm muted">Log session bests and follow your pace over time.</div>
           </Link>
           {isOwner ? (
             <Link
-              className="card-solid p-5 transition-shadow hover:shadow-[0_18px_45px_rgba(16,19,24,0.12)]"
+              className="feature-card"
+              data-index="05"
               href={`/league/${league.code}/admin`}
             >
-              <div className="mono text-xs muted">Tools</div>
-              <div className="mt-1 text-lg font-semibold">Admin</div>
-              <div className="mt-1 text-sm muted">Sync season + results.</div>
+              <div className="eyebrow">Owner</div>
+              <div className="feature-card-title mt-5">Race Control</div>
+              <div className="mt-3 max-w-xs text-sm muted">Sync results, review picks and manage access.</div>
             </Link>
           ) : null}
         </div>

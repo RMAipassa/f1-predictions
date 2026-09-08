@@ -44,11 +44,9 @@ export default function ThemeToggle() {
         setThemeState(next);
       }}
       aria-label="Toggle theme"
-      title={theme === 'dark' ? 'Switch to light mode (HP Ferrari)' : 'Switch to dark mode (Oracle Red Bull)'}
+      title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      <span className="mono text-xs">{theme === 'dark' ? 'ORACLE RB' : 'HP FERRARI'}</span>
-      <span className="mono text-xs muted">/</span>
-      <span className="mono text-xs">{next.toUpperCase()}</span>
+      <span className="mono text-xs">{next.toUpperCase()} MODE</span>
     </button>
   );
 }

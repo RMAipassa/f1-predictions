@@ -58,14 +58,14 @@ export default async function LeaguesPage() {
     <main className="app-bg">
       <LiveUpdates />
       <div className="shell">
-        <div className="flex items-start justify-between gap-4">
+        <div className="page-header">
           <div>
-            <div className="mono text-xs muted">Welcome, {user.nickname}</div>
-            <h1 className="text-4xl leading-none h-display">Leagues</h1>
-            <p className="mt-2 text-sm muted">All leagues on this host. Join by code or request access.</p>
+            <div className="eyebrow">Driver / {user.nickname}</div>
+            <h1 className="mt-3 text-6xl leading-[0.88] h-display md:text-8xl">Your Paddock</h1>
+            <p className="mt-4 max-w-xl text-sm muted">Enter a league, make the call, and see who read the weekend right.</p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <Link className="btn" href="/join">
               Join by code
             </Link>
@@ -86,18 +86,22 @@ export default async function LeaguesPage() {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-3">
-          <div className="mono text-xs muted">YOUR LEAGUES</div>
+        <div className="mt-10 grid gap-3">
+          <div className="eyebrow">Your Leagues</div>
           {yourLeagues.map((row: any) => (
-            <div key={row.id} className="card-solid p-4">
-              <div className="flex items-start justify-between gap-3">
+            <div key={row.id} className="border-t border-[var(--border-strong)] bg-[var(--card-solid)] p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <div className="text-lg font-semibold">{row.name}</div>
-                  <div className="mt-1 mono text-xs muted">Invite: {row.code}</div>
+                  <div className="h-display text-3xl leading-none">{row.name}</div>
+                  <div className="mt-2 flex items-center gap-3 mono text-xs muted">
+                    <span>{row.member_role}</span>
+                    <span>/</span>
+                    <span>Invite {row.code}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Link className="btn" href={`/league/${row.code}`}>
-                    Open
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link className="btn btn-primary" href={`/league/${row.code}`}>
+                    Enter league
                   </Link>
                   {row.member_role === 'member' ? (
                     <form action={leave}>
@@ -109,7 +113,6 @@ export default async function LeaguesPage() {
                   ) : null}
                 </div>
               </div>
-              <div className="mt-2 text-sm muted">Role: <span className="mono">{row.member_role}</span></div>
             </div>
           ))}
 
@@ -120,18 +123,18 @@ export default async function LeaguesPage() {
             </div>
           ) : null}
 
-          <div className="mt-6 mono text-xs muted">ALL LEAGUES</div>
+          <div className="eyebrow mt-8">Open Requests</div>
           {otherLeagues.map((row: any) => {
             const status = row.join_status as string | null;
             const disabled = status === 'pending' || status === 'approved';
             const label = status === 'pending' ? 'Requested' : status === 'approved' ? 'Approved' : 'Request to join';
 
             return (
-              <div key={row.id} className="card-solid p-4">
-                <div className="flex items-start justify-between gap-3">
+              <div key={row.id} className="border-t border-[var(--border)] bg-[var(--card)] p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <div className="text-lg font-semibold">{row.name}</div>
-                    <div className="mt-1 mono text-xs muted">Private league</div>
+                    <div className="h-display text-2xl leading-none">{row.name}</div>
+                    <div className="mt-2 mono text-xs muted">Private league / approval required</div>
                   </div>
                   <form action={requestJoin}>
                     <input type="hidden" name="league_id" value={row.id} />
